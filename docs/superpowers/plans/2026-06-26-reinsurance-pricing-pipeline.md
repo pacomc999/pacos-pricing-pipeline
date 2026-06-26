@@ -492,9 +492,10 @@ git commit -m "Add frequency fitting and sampling"
 - [ ] **Step 1: Write the failing test `tests/testthat/test-fit_severity.R`**
 
 ```r
-test_that("fit_pareto_alpha reproduces the notes alpha of 1.184", {
+test_that("fit_pareto_alpha reproduces the notes alpha (1.185 at 3 dp)", {
   x <- c(12, 9.5, 18, 13, 7, 11, 14)   # losses above s = 5
-  expect_equal(round(fit_pareto_alpha(x, x0 = 5), 3), 1.184)
+  # 7 / sum(log(x/5)) = 1.18477; the notes quote 1.184, which is 1.185 at 3 dp.
+  expect_equal(round(fit_pareto_alpha(x, x0 = 5), 3), 1.185)
 })
 
 test_that("fit_severity splits body and tail at s, conditional on mt", {
