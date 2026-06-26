@@ -35,8 +35,9 @@ ui <- shiny::fluidPage(
   shiny::titlePanel("Paco's Pragmatic Pricing Pipeline"),
   shiny::sidebarLayout(
     shiny::sidebarPanel(
-      shiny::fileInput("file", "Upload pricing workbook (.xlsx)", accept = ".xlsx"),
-      shiny::helpText("Adjust the thresholds and watch the Fit tab update."),
+      shiny::fileInput("file", "Workbook (optional; defaults to input.xlsx)",
+                       accept = ".xlsx"),
+      shiny::helpText("Loads input.xlsx automatically. Adjust the thresholds and watch the Fit tab update."),
       shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
       shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
       shiny::selectInput("freq", "Frequency model",
@@ -81,10 +82,17 @@ server <- function(input, output, session) {
   })
   shiny::observeEvent(input$quit, shiny::stopApp())
 
-  # Read the uploaded workbook once.
+  # Read the workbook: an uploaded file if provided, otherwise the local
+  # input.xlsx next to the launchers. This means a browser refresh reloads the
+  # file (and picks up any edits) instead of losing it.
   input_data <- shiny::reactive({
-    shiny::req(input$file)
-    read_input(input$file$datapath)
+    if (!is.null(input$file)) {
+      read_input(input$file$datapath)
+    } else if (file.exists("../input.xlsx")) {
+      read_input("../input.xlsx")
+    } else {
+      shiny::validate(shiny::need(FALSE, "Place an input.xlsx next to start.vbs, or upload a workbook."))
+    }
   })
 
   # When a workbook is loaded, seed the controls from its defaults (or built-in
