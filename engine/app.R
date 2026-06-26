@@ -31,13 +31,20 @@ build_results_table <- function(priced) {
 .app_sessions <- new.env(parent = emptyenv())
 .app_sessions$count <- 0L
 
+# Process-level store for the most recently uploaded data. It outlives an
+# individual browser session, so a page refresh (which starts a new session)
+# reloads the same data instead of clearing it. It is empty again when the tool
+# is closed and relaunched (a new R process).
+.app_state <- new.env(parent = emptyenv())
+.app_state$data <- NULL
+.app_state$name <- NULL
+
 ui <- shiny::fluidPage(
   shiny::titlePanel("Paco's Pragmatic Pricing Pipeline"),
   shiny::sidebarLayout(
     shiny::sidebarPanel(
-      shiny::fileInput("file", "Workbook (optional; defaults to input.xlsx)",
-                       accept = ".xlsx"),
-      shiny::helpText("Loads input.xlsx automatically. Adjust the thresholds and watch the Fit tab update."),
+      shiny::fileInput("file", "Upload pricing workbook (.xlsx)", accept = ".xlsx"),
+      shiny::helpText("Your upload stays loaded across page refreshes. Adjust the thresholds and watch the Fit tab update."),
       shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
       shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
       shiny::selectInput("freq", "Frequency model",
@@ -82,17 +89,22 @@ server <- function(input, output, session) {
   })
   shiny::observeEvent(input$quit, shiny::stopApp())
 
-  # Read the workbook: an uploaded file if provided, otherwise the local
-  # input.xlsx next to the launchers. This means a browser refresh reloads the
-  # file (and picks up any edits) instead of losing it.
+  # Initialise this session's data from the process-level store, so a refresh
+  # comes back to the last upload.
+  rv <- shiny::reactiveValues(data = .app_state$data, name = .app_state$name)
+
+  # On upload, read the workbook and remember it for this session and the process.
+  shiny::observeEvent(input$file, {
+    rv$data <- read_input(input$file$datapath)
+    rv$name <- input$file$name
+    .app_state$data <- rv$data
+    .app_state$name <- rv$name
+  })
+
   input_data <- shiny::reactive({
-    if (!is.null(input$file)) {
-      read_input(input$file$datapath)
-    } else if (file.exists("../input.xlsx")) {
-      read_input("../input.xlsx")
-    } else {
-      shiny::validate(shiny::need(FALSE, "Place an input.xlsx next to start.vbs, or upload a workbook."))
-    }
+    shiny::validate(shiny::need(!is.null(rv$data),
+      "Upload a pricing workbook (.xlsx) to begin."))
+    rv$data
   })
 
   # When a workbook is loaded, seed the controls from its defaults (or built-in

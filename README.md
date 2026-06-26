@@ -55,7 +55,7 @@ Run these from inside the `engine` folder:
 2. Install dependencies: `Rscript install_deps.R`
 3. Generate the input template: `Rscript make_example.R` (writes ../input.xlsx)
 4. Launch the dashboard: `Rscript -e "shiny::runApp('.', launch.browser = TRUE)"`
-5. `input.xlsx` loads automatically; set the thresholds on the Fit tab, then click Run pricing.
+5. Upload `input.xlsx`, set the thresholds on the Fit tab, then click Run pricing.
 
 ## Pricing without the UI
 From inside the `engine` folder:
@@ -84,8 +84,9 @@ so you can tune them while watching the fit.
 See `engine/make_example.R` for a complete example.
 
 ## Using the dashboard
-1. It loads `input.xlsx` automatically (refreshing the page reloads the file and
-   picks up any edits). Upload a workbook only to try a different one.
+1. Upload your workbook (`input.xlsx`, or any file with the same sheets). The
+   upload stays loaded if you refresh the page; it is cleared only when you
+   close the tool.
 2. On the **Fit** tab, adjust the modelling threshold and splice point while
    watching the mean-excess plot (to choose where the tail begins), the fitted
    vs empirical severity, and the live fitted parameters (lambda, alpha, etc.).
