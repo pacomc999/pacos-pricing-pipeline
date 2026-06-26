@@ -45,9 +45,9 @@ blocks CRAN), the tool does not launch into a cryptic error: `start.bat` prints
 a plain-English message naming the missing packages, and `start.vbs` shows the
 same message in a popup. To use an internal CRAN mirror, create a file named
 `CRAN_MIRROR.txt` in the `engine` folder containing the mirror URL, then run the
-launcher again. The packages used are `shiny`, `actuar`, `fitdistrplus`,
-`readxl`, `openxlsx`, and `ggplot2` (all available as ready-built Windows
-binaries on CRAN, so no compiler is needed).
+launcher again. The packages used are `shiny`, `fitdistrplus`, `readxl`, and
+`openxlsx` (plus `later`, which ships with shiny). All are available as
+ready-built Windows binaries on CRAN, so no compiler is needed.
 
 ## Quick start (any platform, command line)
 Run these from inside the `engine` folder:

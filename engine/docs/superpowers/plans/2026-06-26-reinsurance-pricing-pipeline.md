@@ -1,5 +1,13 @@
 # Reinsurance Pricing Pipeline Implementation Plan
 
+> **Status (historical build plan):** This records how the tool was originally
+> built task by task. The delivered tool then evolved beyond it: files live in
+> `engine/`, the modelling choices (thresholds, frequency model, simulations,
+> loadings) are live dashboard controls rather than workbook values, and the
+> dependencies were trimmed (no `actuar` or `ggplot2`; plots use base graphics).
+> For the current design see the design spec and the README; this plan is kept
+> as a record, not living documentation.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build an R + Shiny tool that prices non-proportional reinsurance from an Excel loss list and returns prices plus risk metrics as Excel and an interactive dashboard.

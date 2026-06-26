@@ -1,7 +1,8 @@
 # Paco's Pragmatic Pricing Pipeline — Design Spec (v1)
 
-Date: 2026-06-26
-Status: Approved (design); pending implementation plan
+Date: 2026-06-26 (updated to reflect the delivered tool)
+Status: Implemented. Sections 4, 9, 10, 11, 13 updated post-build to match the
+delivered design (data-only workbook, live dashboard controls, dependency trim).
 Author: Francisco Martinez Checa, with Claude
 
 ## 1. Purpose
@@ -77,15 +78,22 @@ Used for the exposure-correction factor (exposure in valuation year / exposure i
 loss year).
 
 ### Sheet `parameters`
+Only the data parameters live in the workbook. The modelling choices
+(modelling threshold, splice threshold, frequency model, simulations, loadings,
+VaR level) are set as live controls in the dashboard, so the user can tune them
+while watching the fit. The workbook may optionally carry any of them as a
+starting default; precedence is dashboard override > workbook value > built-in
+default (see `resolve_settings`).
+
 | key | example | notes |
 |-----|---------|-------|
 | `reporting_threshold` | 3,000,000 | losses below this are not reported in the data |
 | `loss_inflation_pa` | 0.02 | annual loss inflation used for indexation |
-| `modelling_threshold` | 5,000,000 | MT: losses above this enter the model and drive frequency; must satisfy `reporting_threshold <= MT <= lowest layer deductible` |
-| `splice_threshold` | 15,000,000 | s: lognormal body below, Pareto tail above; must satisfy `MT < s` and should sit inside the layer range so the body prices lower layers |
-| `frequency_model` | `poisson` | one of `poisson`, `negbin`, `binomial` |
-| `n_simulations` | 100,000 | Monte Carlo iterations |
 | `valuation_year` | 2026 | year all losses are revalued to |
+
+Constraints carried into the dashboard controls: `reporting_threshold <= MT <=
+lowest layer deductible`, and `MT <= s` (with `s = MT` collapsing to a single
+Pareto).
 
 ### Sheet `contract`
 One row per XL layer in the program.
@@ -193,16 +201,18 @@ reinstatements, and volatility metrics come from the simulation.
 
 ## 9. Outputs and premium principles
 
-Per layer:
+Per layer (implemented in `price_layer`):
 - Expected loss (simulated) and closed-form expected loss + the validation delta.
 - Standard deviation, VaR and TVaR at user-chosen levels.
 - Rate-on-line `RoL = premium / limit`.
-- Return period and excess frequency at the attachment point.
 - Premium under:
   - **Expected-value principle:** `P = (1 + theta) * E[loss]`.
   - **Standard-deviation principle:** `P = E[loss] + theta * sd[loss]`.
   - Loading factors `theta` are user inputs.
-- Burning cost (simple and advanced) shown alongside as a benchmark.
+
+Not yet surfaced (v1.1 backlog): return period and excess frequency at the
+attachment point; burning cost (computed by `burning_cost` but not yet shown in
+the output or dashboard).
 
 ## 10. Output Excel and dashboard
 
@@ -211,28 +221,39 @@ Per layer:
 - `assumptions` sheet: echo of the fitted parameters and all inputs used.
 
 ### Shiny dashboard
-- Excel upload and parameter overrides.
-- Fitted-distribution diagnostics: severity QQ plot, mean-excess plot (to support
-  threshold choice), fitted vs empirical CDF, frequency fit summary.
-- Per-layer pricing table.
-- Simulated aggregate loss distribution plots.
-- Closed-form vs simulation validation comparison.
-- Download button for the Excel output.
+- Excel upload (data only) plus live controls for the modelling choices:
+  modelling threshold, splice threshold, frequency model, simulations, both
+  loadings, and the VaR level.
+- **Fit tab** (recomputes live as the thresholds change, via `fit_models`):
+  mean-excess plot to support threshold choice, fitted vs empirical severity
+  CDF, and a live readout of the fitted parameters (lambda, alpha, mu, sigma,
+  tail weight).
+- **Pricing tab**: per-layer pricing table (runs the Monte Carlo on demand).
+- **Validation tab**: closed-form (oracle) vs simulation comparison per layer.
+- Download button writing `output.xlsx` (results + assumptions).
+- Self-shutdown: a Shut down button and auto-stop when the last browser tab
+  closes (grace period tolerates refresh).
+
+Not yet implemented (v1.1 backlog): severity QQ plot and a simulated aggregate
+loss distribution plot.
 
 ## 11. R module structure
 
-Each module is independently testable.
+Each module is independently testable. The modules live in `engine/R/`; `app.R`
+sits in `engine/`.
 
 | file | responsibility |
 |------|----------------|
 | `io.R` | read input workbook, write output workbook (`readxl`, `openxlsx`) |
+| `layers.R` | shared `apply_layer(x, D, C)` loss-to-layer function |
 | `preprocess.R` | indexation, exposure correction, burning cost benchmark |
-| `fit_severity.R` | fit spliced lognormal + Pareto, expose CDF / sampler |
+| `fit_severity.R` | fit spliced lognormal + Pareto; `severity_survival`, sampler, `mean_excess` |
 | `fit_frequency.R` | fit Poisson / NegBin / Binomial from counts |
 | `simulate.R` | Monte Carlo aggregate loss generation |
 | `price.R` | apply contract structures, compute premium principles and metrics |
-| `validate.R` | closed-form expected layer loss formulas |
-| `app.R` | Shiny UI + server |
+| `validate.R` | closed-form / numerical-integration validation oracle |
+| `pipeline.R` | `resolve_settings`, `fit_models` (fast), `price_models`, `run_pricing` |
+| `app.R` | Shiny UI + server (live Fit tab, on-demand pricing) |
 
 ## 12. Validation and testing
 
@@ -249,9 +270,15 @@ Each module is independently testable.
 
 ## 13. Dependencies
 
-R packages: `shiny`, `actuar` (loss distributions, coverage modifications,
-limited expected values), `fitdistrplus` (MLE fitting), `readxl` (read Excel),
-`openxlsx` (write Excel), `ggplot2` (plots), `testthat` (tests).
+R packages actually used: `shiny` (dashboard; brings `later`, used for the
+self-shutdown timer), `fitdistrplus` (lognormal MLE), `readxl` (read Excel),
+`openxlsx` (write Excel), and `testthat` (tests). Plots use base R graphics.
+
+Note: the original design anticipated `actuar` (for loss distributions and
+limited expected values) and `ggplot2`. Neither is used in the delivered tool:
+the layer formulas were implemented directly in `validate.R` (closed form plus
+`stats::integrate`), and the plots use base graphics. Both were dropped from
+`install_deps.R` to keep installs light on locked-down machines.
 
 ## 14. Future (v2+)
 

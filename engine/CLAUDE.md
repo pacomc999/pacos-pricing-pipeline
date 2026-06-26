@@ -16,7 +16,7 @@ inside this `engine/` folder:
 - Install dependencies once: `Rscript install_deps.R`
 - Run the test suite: `Rscript run_tests.R`
 - Launch the dashboard: `Rscript -e "shiny::runApp('.')"` (or open app.R in RStudio and click Run App)
-- Price a workbook without the UI: source R/pipeline.R and call run_pricing()
+- Price a workbook without the UI: `source("app.R")` (loads every R/ module), then call `run_pricing("../input.xlsx", overrides = list(...))`
 - Regenerate the top-level input.xlsx template: `Rscript make_example.R`
 
 ## Layout
