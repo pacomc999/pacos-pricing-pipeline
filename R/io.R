@@ -16,13 +16,15 @@ read_input <- function(path) {
   # Parameters arrive as key/value rows; turn them into a typed named list.
   raw_params <- as.data.frame(readxl::read_excel(path, sheet = "parameters"))
   pv <- setNames(as.character(raw_params$value), raw_params$key)
+  # pv is a named character vector, so check the name exists before subsetting
+  # (pv[["missing"]] would throw "subscript out of bounds", not return NULL).
   num <- function(k) {
-    if (is.null(pv[[k]]) || is.na(pv[[k]])) {
+    if (!k %in% names(pv) || is.na(pv[[k]])) {
       stop("Missing required parameter in the 'parameters' sheet: ", k)
     }
     as.numeric(pv[[k]])
   }
-  if (is.null(pv[["frequency_model"]])) {
+  if (!"frequency_model" %in% names(pv)) {
     stop("Missing required parameter in the 'parameters' sheet: frequency_model")
   }
   parameters <- list(
