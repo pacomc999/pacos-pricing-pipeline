@@ -28,6 +28,14 @@ to `Rscript.exe`, for example:
 D:\Tools\R\R-4.5.2\bin\Rscript.exe
 ```
 
+If the required R packages cannot be installed (for example the company network
+blocks CRAN), `start.bat` stops and prints a plain-English message naming the
+missing packages instead of launching into an error. To use an internal CRAN
+mirror, create a file named `CRAN_MIRROR.txt` next to `start.bat` containing the
+mirror URL, then run `start.bat` again. The packages used are `shiny`,
+`actuar`, `fitdistrplus`, `readxl`, `openxlsx`, and `ggplot2` (all available as
+ready-built Windows binaries on CRAN, so no compiler is needed).
+
 ## Quick start (any platform, command line)
 1. Install R (4.x).
 2. Install dependencies: `Rscript install_deps.R`

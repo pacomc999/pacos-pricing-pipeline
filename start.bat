@@ -33,6 +33,12 @@ if not defined RSCRIPT goto :notfound
 echo Using R at: %RSCRIPT%
 echo Checking dependencies (the first run can take a few minutes)...
 "%RSCRIPT%" install_deps.R
+if errorlevel 1 (
+  echo.
+  echo Setup did not complete; see the message above.
+  echo The dashboard was not started.
+  goto :end
+)
 if not exist "example_input.xlsx" "%RSCRIPT%" make_example.R
 
 echo.
