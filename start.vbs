@@ -17,12 +17,20 @@ logFile = sh.ExpandEnvironmentStrings("%TEMP%") & "\pppp_launch_log.txt"
 cmdline = "cmd /c call " & q & bat & q & " hidden > " & q & logFile & q & " 2>&1"
 ret = sh.Run(cmdline, 0, True)
 
-' A non-zero exit means setup failed (R missing, packages could not install).
-' Show the captured messages so the user is not left guessing.
-If ret <> 0 Then
-  msg = "Paco's Pricing Pipeline could not start." & vbCrLf & vbCrLf
-  If fso.FileExists(logFile) Then
-    msg = msg & fso.OpenTextFile(logFile, 1).ReadAll()
-  End If
+' A non-zero exit code can mean two very different things:
+'   1) Setup failed (R missing, packages could not install) - a real problem.
+'   2) The app started fine and you just closed it - shiny::runApp also returns
+'      a non-zero code on a normal shutdown.
+' To tell them apart, read the log: it only prints "Listening on" once the
+' dashboard has actually started. If that line is there, any non-zero exit is
+' just a normal shutdown, so stay quiet. Only show the popup on a real failure.
+Dim logText
+logText = ""
+If fso.FileExists(logFile) Then
+  logText = fso.OpenTextFile(logFile, 1).ReadAll()
+End If
+
+If ret <> 0 And InStr(logText, "Listening on") = 0 Then
+  msg = "Paco's Pricing Pipeline could not start." & vbCrLf & vbCrLf & logText
   MsgBox msg, vbExclamation, "Pricing Pipeline"
 End If
