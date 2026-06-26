@@ -23,6 +23,13 @@ build_results_table <- function(priced) {
   )
 }
 
+# Counts connected browser sessions so the app can shut itself down when the
+# last tab closes. An environment is used because it is mutable by reference and
+# shared across all sessions. A short grace period (see server) tolerates a page
+# refresh, which briefly drops to zero sessions before reconnecting.
+.app_sessions <- new.env(parent = emptyenv())
+.app_sessions$count <- 0L
+
 ui <- shiny::fluidPage(
   shiny::titlePanel("Paco's Pragmatic Pricing Pipeline"),
   shiny::sidebarLayout(
@@ -31,7 +38,10 @@ ui <- shiny::fluidPage(
                        accept = ".xlsx"),
       shiny::numericInput("seed", "Random seed", value = 1),
       shiny::actionButton("run", "Run pricing"),
-      shiny::downloadButton("download", "Download results")
+      shiny::downloadButton("download", "Download results"),
+      shiny::tags$hr(),
+      shiny::actionButton("quit", "Shut down", class = "btn-danger"),
+      shiny::helpText("Shut down (or just close this browser tab) to stop the tool.")
     ),
     shiny::mainPanel(
       shiny::tabsetPanel(
@@ -44,6 +54,21 @@ ui <- shiny::fluidPage(
 )
 
 server <- function(input, output, session) {
+  # Self-shutdown lifecycle: count this session, and when a session ends, stop
+  # the app after a grace period if no sessions remain (so refresh is safe).
+  .app_sessions$count <- .app_sessions$count + 1L
+  session$onSessionEnded(function() {
+    .app_sessions$count <- .app_sessions$count - 1L
+    later::later(function() {
+      if (.app_sessions$count <= 0L) shiny::stopApp()
+    }, delay = 5)
+  })
+
+  # Explicit shut-down button.
+  shiny::observeEvent(input$quit, {
+    shiny::stopApp()
+  })
+
   priced <- shiny::eventReactive(input$run, {
     shiny::req(input$file)
     run_pricing(input$file$datapath, seed = input$seed)

@@ -8,6 +8,11 @@ setlocal enableextensions
 cd /d "%~dp0"
 set "RSCRIPT="
 
+REM "hidden" is passed by start.vbs: skip the pause and use exit codes so the
+REM hidden launcher can detect failure and show a popup.
+set "HIDDEN="
+if /i "%~1"=="hidden" set "HIDDEN=1"
+
 REM 0) Manual override: paste a full path to Rscript.exe into R_PATH.txt.
 if exist "R_PATH.txt" set /p RSCRIPT=<R_PATH.txt
 if defined RSCRIPT if not exist "%RSCRIPT%" set "RSCRIPT="
@@ -33,19 +38,15 @@ if not defined RSCRIPT goto :notfound
 echo Using R at: %RSCRIPT%
 echo Checking dependencies (the first run can take a few minutes)...
 "%RSCRIPT%" install_deps.R
-if errorlevel 1 (
-  echo.
-  echo Setup did not complete; see the message above.
-  echo The dashboard was not started.
-  goto :end
-)
+if errorlevel 1 goto :depsfail
 if not exist "example_input.xlsx" "%RSCRIPT%" make_example.R
 
 echo.
 echo Starting Paco's Pragmatic Pricing Pipeline.
-echo A browser tab will open. Keep this window open while you use the tool;
-echo close it to stop the dashboard.
+echo A browser tab will open. Use the "Shut down" button in the dashboard (or
+echo just close the browser tab) to stop the tool.
 "%RSCRIPT%" -e "shiny::runApp('.', launch.browser = TRUE)"
+if defined HIDDEN exit /b 0
 goto :end
 
 :fromreg
@@ -73,6 +74,15 @@ echo   - If R is installed in an unusual place, create a file named R_PATH.txt
 echo     in this folder containing the full path to Rscript.exe, for example:
 echo       D:\Tools\R\R-4.5.2\bin\Rscript.exe
 echo.
+if defined HIDDEN exit /b 2
+goto :end
+
+:depsfail
+echo.
+echo Setup did not complete; see the message above.
+echo The dashboard was not started.
+if defined HIDDEN exit /b 1
+goto :end
 
 :end
 pause

@@ -4,37 +4,47 @@ An R and Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out.
 
 ## Easiest start (Windows)
-**Double-click `start.bat`.** It is pure batch (no PowerShell) so it runs on
-locked-down company machines. It finds an existing R install automatically,
-whatever the version and wherever it lives, by checking:
+**Double-click `start.vbs`.** The dashboard opens in your browser with no
+console window. To stop the tool, click **Shut down** in the dashboard, or just
+close the browser tab (it shuts itself down automatically a few seconds later).
+
+If your company blocks `.vbs` files, double-click **`start.bat`** instead. It
+does exactly the same thing but shows a small console window (close it to stop
+the tool). `start.bat` is also handy when you want to see progress or error
+messages directly.
+
+Both launchers find an existing R install automatically, whatever the version
+and wherever it lives, by checking:
 1. a `R_PATH.txt` file in this folder, if present (see below),
 2. `Rscript` on the PATH,
 3. the Windows registry (where R records its install path),
 4. the usual folders (`Program Files\R`, `Program Files (x86)\R`, and the
    per-user `Local\Programs\R`), newest version first.
 
-Then it installs the package dependencies (first run only), generates the
-example workbook, and opens the dashboard in your browser. Keep the small black
-window open while you use the tool; close it to stop the dashboard. Loss data
-stays on the machine and is never uploaded anywhere.
+They then install the package dependencies (first run only), generate the
+example workbook, and open the dashboard. Loss data stays on the machine and is
+never uploaded anywhere. (`start.bat` is pure batch with no PowerShell, so it
+runs on locked-down machines; `start.vbs` uses Windows Script Host purely to
+hide the console.)
 
-R must already be installed (this launcher does not install it, since company
-machines often block installers). If `start.bat` cannot find R, either install
-R from https://cran.r-project.org or, when R sits in an unusual location,
-create a file named `R_PATH.txt` next to `start.bat` containing the full path
-to `Rscript.exe`, for example:
+R must already be installed (the launchers do not install it, since company
+machines often block installers). If R cannot be found, either install R from
+https://cran.r-project.org or, when R sits in an unusual location, create a file
+named `R_PATH.txt` next to the launchers containing the full path to
+`Rscript.exe`, for example:
 
 ```
 D:\Tools\R\R-4.5.2\bin\Rscript.exe
 ```
 
 If the required R packages cannot be installed (for example the company network
-blocks CRAN), `start.bat` stops and prints a plain-English message naming the
-missing packages instead of launching into an error. To use an internal CRAN
-mirror, create a file named `CRAN_MIRROR.txt` next to `start.bat` containing the
-mirror URL, then run `start.bat` again. The packages used are `shiny`,
-`actuar`, `fitdistrplus`, `readxl`, `openxlsx`, and `ggplot2` (all available as
-ready-built Windows binaries on CRAN, so no compiler is needed).
+blocks CRAN), the tool does not launch into a cryptic error: `start.bat` prints
+a plain-English message naming the missing packages, and `start.vbs` shows the
+same message in a popup. To use an internal CRAN mirror, create a file named
+`CRAN_MIRROR.txt` next to the launchers containing the mirror URL, then run the
+launcher again. The packages used are `shiny`, `actuar`, `fitdistrplus`,
+`readxl`, `openxlsx`, and `ggplot2` (all available as ready-built Windows
+binaries on CRAN, so no compiler is needed).
 
 ## Quick start (any platform, command line)
 1. Install R (4.x).
