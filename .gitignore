@@ -3,4 +3,4 @@
 .RData
 .Rapp.history
 *.xlsx
-!example_input.xlsx
+!input.xlsx

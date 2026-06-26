@@ -7,7 +7,7 @@ Dim sh, fso, here, bat, logFile, q, cmdline, ret, msg
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 here = fso.GetParentFolderName(WScript.ScriptFullName)
-bat = here & "\start.bat"
+bat = here & "\engine\start.bat"
 q = Chr(34)
 logFile = sh.ExpandEnvironmentStrings("%TEMP%") & "\pppp_launch_log.txt"
 

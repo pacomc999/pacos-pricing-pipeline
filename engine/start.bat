@@ -39,7 +39,7 @@ echo Using R at: %RSCRIPT%
 echo Checking dependencies (the first run can take a few minutes)...
 "%RSCRIPT%" install_deps.R
 if errorlevel 1 goto :depsfail
-if not exist "example_input.xlsx" "%RSCRIPT%" make_example.R
+if not exist "..\input.xlsx" "%RSCRIPT%" make_example.R
 
 echo.
 echo Starting Paco's Pragmatic Pricing Pipeline.
