@@ -47,3 +47,14 @@ read_input <- function(path) {
   list(losses = losses, exposure = exposure,
        parameters = parameters, contract = contract)
 }
+
+# Writes pricing results and the assumptions echo to a two-sheet workbook.
+write_output <- function(path, results, assumptions) {
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "results")
+  openxlsx::writeData(wb, "results", results)
+  openxlsx::addWorksheet(wb, "assumptions")
+  openxlsx::writeData(wb, "assumptions", assumptions)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  invisible(path)
+}
