@@ -72,15 +72,17 @@ price_models <- function(fits, contract, settings, seed = NULL) {
 
 # End-to-end pricing from a workbook. `overrides` is a named list of modelling
 # settings (as the dashboard supplies); anything omitted falls back to the
-# workbook then to built-in defaults.
-run_pricing <- function(input_path, overrides = list(), output_path = NULL,
+# workbook then to built-in defaults. `contract` is the program to price; the
+# workbook no longer carries it, so it defaults to the built-in demo program.
+run_pricing <- function(input_path, overrides = list(),
+                        contract = default_contract(), output_path = NULL,
                         seed = NULL) {
   input <- read_input(input_path)
   settings <- resolve_settings(input$parameters, overrides)
   fits <- fit_models(input, settings)
-  priced <- price_models(fits, input$contract, settings, seed)
+  priced <- price_models(fits, contract, settings, seed)
   results <- priced$results
-  bc <- burning_cost(fits$losses, input$contract)
+  bc <- burning_cost(fits$losses, contract)
 
   if (!is.null(output_path)) {
     assumptions <- data.frame(

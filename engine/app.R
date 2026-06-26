@@ -8,6 +8,37 @@
 # e.g. tests, where the modules are already loaded by the test helper).
 for (f in list.files("R", pattern = "[.]R$", full.names = TRUE)) source(f)
 
+# Assembles the contract data frame the pricer expects from the edited layer
+# rows, keeping only the pricing columns in the right order (pure, unit-tested).
+build_contract_df <- function(layer_rows) {
+  data.frame(
+    deductible       = as.numeric(layer_rows$deductible),
+    cover            = as.numeric(layer_rows$cover),
+    n_reinstatements = as.numeric(layer_rows$n_reinstatements),
+    aad              = as.numeric(layer_rows$aad),
+    aal              = as.numeric(layer_rows$aal)
+  )
+}
+
+# Checks the edited contract before pricing. Returns NULL when it is fine to
+# price, otherwise a plain message to show the user (pure, unit-tested).
+validate_contract <- function(contract) {
+  if (nrow(contract) == 0) return("Add at least one layer to price.")
+  if (any(is.na(contract$cover)) || any(contract$cover <= 0)) {
+    return("Every layer needs a cover greater than 0.")
+  }
+  if (any(contract$deductible < 0, na.rm = TRUE)) {
+    return("Deductible cannot be negative.")
+  }
+  if (any(contract$n_reinstatements < 0, na.rm = TRUE)) {
+    return("Reinstatements cannot be negative.")
+  }
+  if (any(contract$aad < 0, na.rm = TRUE) || any(contract$aal < 0, na.rm = TRUE)) {
+    return("AAD and AAL cannot be negative.")
+  }
+  NULL
+}
+
 # Formats the priced results for on-screen display (pure, unit-tested).
 build_results_table <- function(priced) {
   data.frame(
@@ -65,6 +96,18 @@ ui <- shiny::fluidPage(
     ),
     shiny::mainPanel(
       shiny::tabsetPanel(
+        shiny::tabPanel("Structure",
+          shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers, then click Run pricing."),
+          shiny::fluidRow(
+            shiny::column(2, shiny::tags$strong("Deductible")),
+            shiny::column(2, shiny::tags$strong("Cover")),
+            shiny::column(2, shiny::tags$strong("Reinstatements")),
+            shiny::column(2, shiny::tags$strong("AAD")),
+            shiny::column(2, shiny::tags$strong("AAL")),
+            shiny::column(2, "")
+          ),
+          shiny::uiOutput("structure_ui"),
+          shiny::actionButton("add_layer", "Add layer")),
         shiny::tabPanel("Fit",
           shiny::helpText("These update live as you change MT and the splice. Red line = MT, blue dashed = splice."),
           shiny::plotOutput("me_plot"),
@@ -88,6 +131,101 @@ server <- function(input, output, session) {
     }, delay = 5)
   })
   shiny::observeEvent(input$quit, shiny::stopApp())
+
+  # ---- Editable contract structure ----
+  # The dashboard owns the program now (it is no longer in the workbook). Layers
+  # live in a reactiveValues data frame keyed by a stable integer id, so adding
+  # or removing one never reshuffles the others. Each layer's live values are
+  # held in numericInputs named layer_<id>_<field>, read back when pricing.
+  layers <- shiny::reactiveValues(seq = 0L, df = NULL)
+  observed_removes <- new.env(parent = emptyenv())
+
+  # Copies current input values back into layers$df so an add/remove (which
+  # re-renders the table) does not lose edits made to the other rows.
+  snapshot_edits <- function() {
+    df <- layers$df
+    if (is.null(df) || nrow(df) == 0) return(invisible())
+    for (i in seq_len(nrow(df))) {
+      id <- df$id[i]
+      for (f in c("deductible", "cover", "n_reinstatements", "aad", "aal")) {
+        v <- input[[paste0("layer_", id, "_", f)]]
+        if (!is.null(v) && !is.na(v)) df[i, f] <- v
+      }
+    }
+    layers$df <- df
+  }
+
+  # Wires one Remove button to drop its layer. Guarded so re-renders do not
+  # stack duplicate observers on the same id.
+  make_remove_observer <- function(id) {
+    key <- as.character(id)
+    if (!is.null(observed_removes[[key]])) return(invisible())
+    observed_removes[[key]] <- TRUE
+    shiny::observeEvent(input[[paste0("remove_", id)]], {
+      snapshot_edits()
+      layers$df <- layers$df[layers$df$id != id, , drop = FALSE]
+    }, ignoreInit = TRUE)
+  }
+
+  # Seed the default program when the session starts.
+  local({
+    dc <- default_contract()
+    dc$id <- seq_len(nrow(dc))
+    layers$seq <- nrow(dc)
+    layers$df <- dc[, c("id", "deductible", "cover", "n_reinstatements", "aad", "aal")]
+    for (id in dc$id) make_remove_observer(id)
+  })
+
+  # Add a fresh layer seeded with sensible defaults.
+  shiny::observeEvent(input$add_layer, {
+    snapshot_edits()
+    layers$seq <- layers$seq + 1L
+    new_row <- data.frame(id = layers$seq, deductible = 0, cover = 5,
+                          n_reinstatements = 999, aad = 0, aal = 0)
+    layers$df <- rbind(layers$df, new_row)
+    make_remove_observer(layers$seq)
+  })
+
+  # Render one row of numeric inputs per layer.
+  output$structure_ui <- shiny::renderUI({
+    df <- layers$df
+    if (is.null(df) || nrow(df) == 0) {
+      return(shiny::helpText("No layers. Click Add layer to start."))
+    }
+    rows <- lapply(seq_len(nrow(df)), function(i) {
+      id <- df$id[i]
+      nid <- function(f) paste0("layer_", id, "_", f)
+      shiny::fluidRow(
+        shiny::column(2, shiny::numericInput(nid("deductible"), NULL, value = df$deductible[i])),
+        shiny::column(2, shiny::numericInput(nid("cover"), NULL, value = df$cover[i])),
+        shiny::column(2, shiny::numericInput(nid("n_reinstatements"), NULL, value = df$n_reinstatements[i])),
+        shiny::column(2, shiny::numericInput(nid("aad"), NULL, value = df$aad[i])),
+        shiny::column(2, shiny::numericInput(nid("aal"), NULL, value = df$aal[i])),
+        shiny::column(2, shiny::actionButton(paste0("remove_", id), "Remove", class = "btn-danger btn-sm"))
+      )
+    })
+    do.call(shiny::tagList, rows)
+  })
+
+  # The current contract, assembled from the live layer inputs.
+  contract <- shiny::reactive({
+    df <- layers$df
+    empty <- data.frame(deductible = numeric(0), cover = numeric(0),
+                        n_reinstatements = numeric(0), aad = numeric(0),
+                        aal = numeric(0))
+    if (is.null(df) || nrow(df) == 0) return(build_contract_df(empty))
+    rows <- lapply(seq_len(nrow(df)), function(i) {
+      id <- df$id[i]
+      val <- function(f) {
+        v <- input[[paste0("layer_", id, "_", f)]]
+        if (is.null(v)) df[i, f] else v
+      }
+      data.frame(deductible = val("deductible"), cover = val("cover"),
+                 n_reinstatements = val("n_reinstatements"),
+                 aad = val("aad"), aal = val("aal"))
+    })
+    build_contract_df(do.call(rbind, rows))
+  })
 
   # Initialise this session's data from the process-level store, so a refresh
   # comes back to the last upload.
@@ -184,8 +322,11 @@ server <- function(input, output, session) {
   priced <- shiny::eventReactive(input$run, {
     inp <- input_data()
     st <- settings()
+    ct <- contract()
+    msg <- validate_contract(ct)
+    shiny::validate(shiny::need(is.null(msg), msg))
     f <- fit_models(inp, st)
-    price_models(f, inp$contract, st, input$seed)
+    price_models(f, ct, st, input$seed)
   })
 
   output$results <- shiny::renderTable(build_results_table(priced()$results))

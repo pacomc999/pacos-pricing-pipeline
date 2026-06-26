@@ -1,7 +1,8 @@
 # Writes the top-level input.xlsx template: a richer dataset that populates both
 # the lognormal body (losses 5 to 15) and the Pareto tail (losses above 15), so
-# the demo exercises the full spliced severity. Layers span body, splice, tail.
-# This file lives in engine/, so the workbook is written one level up (..).
+# the demo exercises the full spliced severity. The contract structure is set in
+# the dashboard (not the workbook), so this template has only the three data
+# sheets. This file lives in engine/, so the workbook is written one level up.
 wb <- openxlsx::createWorkbook()
 openxlsx::addWorksheet(wb, "losses")
 openxlsx::writeData(wb, "losses", data.frame(
@@ -21,12 +22,6 @@ openxlsx::addWorksheet(wb, "parameters")
 openxlsx::writeData(wb, "parameters", data.frame(
   key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
   value = c("5", "0.03", "2026")
-))
-openxlsx::addWorksheet(wb, "contract")
-openxlsx::writeData(wb, "contract", data.frame(
-  deductible = c(5, 10, 20), cover = c(5, 10, 20),
-  n_reinstatements = c(999, 999, 999), reinstatement_cost = c(0, 0, 0),
-  aad = c(0, 0, 0), aal = c(0, 0, 0)
 ))
 openxlsx::saveWorkbook(wb, "../input.xlsx", overwrite = TRUE)
 cat("Wrote input.xlsx\n")

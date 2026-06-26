@@ -1,7 +1,9 @@
-# Reads the four-sheet pricing workbook into a structured list.
+# Reads the three-sheet pricing workbook into a structured list. The contract
+# structure no longer lives in the workbook; the dashboard owns it (see
+# default_contract() and run_pricing's contract argument).
 read_input <- function(path) {
   if (!file.exists(path)) stop("Input workbook not found: ", path)
-  required_sheets <- c("losses", "exposure", "parameters", "contract")
+  required_sheets <- c("losses", "exposure", "parameters")
   present <- readxl::excel_sheets(path)
   missing <- setdiff(required_sheets, present)
   if (length(missing) > 0) {
@@ -11,7 +13,6 @@ read_input <- function(path) {
 
   losses <- as.data.frame(readxl::read_excel(path, sheet = "losses"))
   exposure <- as.data.frame(readxl::read_excel(path, sheet = "exposure"))
-  contract <- as.data.frame(readxl::read_excel(path, sheet = "contract"))
 
   # Parameters arrive as key/value rows; turn them into a typed named list.
   raw_params <- as.data.frame(readxl::read_excel(path, sheet = "parameters"))
@@ -53,8 +54,7 @@ read_input <- function(path) {
   losses$year <- as.integer(losses$year)
   exposure$year <- as.integer(exposure$year)
 
-  list(losses = losses, exposure = exposure,
-       parameters = parameters, contract = contract)
+  list(losses = losses, exposure = exposure, parameters = parameters)
 }
 
 # Writes pricing results and the assumptions echo to a two-sheet workbook.

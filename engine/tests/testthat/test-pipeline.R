@@ -18,13 +18,15 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
     value = c("5", "0", "5", "5", "poisson", "200000", "2025",
               "0.1", "0.2", "0.99")))
-  openxlsx::addWorksheet(wb, "contract")
-  openxlsx::writeData(wb, "contract", data.frame(
-    deductible = c(5, 10, 20), cover = c(5, 10, 10),
-    n_reinstatements = 999, reinstatement_cost = 0, aad = 0, aal = 0))
   openxlsx::saveWorkbook(wb, path)
 
-  res <- run_pricing(path, seed = 99)$results
+  # The contract is supplied by the caller (dashboard or, here, the test); it is
+  # no longer a workbook sheet. These are the three notes Table 13 layers.
+  contract <- data.frame(
+    deductible = c(5, 10, 20), cover = c(5, 10, 10),
+    n_reinstatements = 999, aad = 0, aal = 0)
+
+  res <- run_pricing(path, contract = contract, seed = 99)$results
   # Table 13 expected sums: 4.56, 4.01, 2.12 (within simulation tolerance).
   expect_true(abs(res$expected_loss[1] - 4.56) < 0.15)
   expect_true(abs(res$expected_loss[2] - 4.01) < 0.15)
@@ -52,13 +54,9 @@ test_that("frequency window excludes the prospective valuation year", {
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
     value = c("5", "0", "5", "5", "poisson", "1000", "2024",
               "0.1", "0.2", "0.99")))
-  openxlsx::addWorksheet(wb, "contract")
-  openxlsx::writeData(wb, "contract", data.frame(
-    deductible = 5, cover = 5, n_reinstatements = 999,
-    reinstatement_cost = 0, aad = 0, aal = 0))
   openxlsx::saveWorkbook(wb, path)
 
-  res <- run_pricing(path, seed = 1)
+  res <- run_pricing(path, seed = 1)   # default contract; frequency is unaffected
   expect_equal(res$fit_frequency$expected, 2.0)   # 6/3, not 6/4
 })
 
@@ -77,16 +75,16 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   openxlsx::writeData(wb, "parameters", data.frame(
     key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
     value = c("5", "0", "2025")))
-  openxlsx::addWorksheet(wb, "contract")
-  openxlsx::writeData(wb, "contract", data.frame(
-    deductible = c(5, 10, 20), cover = c(5, 10, 10),
-    n_reinstatements = 999, reinstatement_cost = 0, aad = 0, aal = 0))
   openxlsx::saveWorkbook(wb, path)
 
+  contract <- data.frame(
+    deductible = c(5, 10, 20), cover = c(5, 10, 10),
+    n_reinstatements = 999, aad = 0, aal = 0)
   overrides <- list(modelling_threshold = 5, splice_threshold = 5,
                     frequency_model = "poisson", n_simulations = 200000,
                     loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
-  res <- run_pricing(path, overrides = overrides, seed = 99)$results
+  res <- run_pricing(path, overrides = overrides, contract = contract,
+                     seed = 99)$results
   # Same as the notes Table 13 since overrides reproduce that configuration.
   expect_true(abs(res$expected_loss[1] - 4.56) < 0.15)
   expect_true(abs(res$expected_loss[3] - 2.12) < 0.15)

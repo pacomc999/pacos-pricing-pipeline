@@ -21,17 +21,11 @@ write_tmp_workbook <- function() {
     value = c("3", "0.02", "5", "15", "poisson", "100000", "2026",
               "0.1", "0.2", "0.99")
   ))
-  openxlsx::addWorksheet(wb, "contract")
-  openxlsx::writeData(wb, "contract", data.frame(
-    deductible = c(5, 10), cover = c(5, 10),
-    n_reinstatements = c(1, 1), reinstatement_cost = c(1, 1),
-    aad = c(0, 0), aal = c(0, 0)
-  ))
   openxlsx::saveWorkbook(wb, path)
   path
 }
 
-test_that("read_input parses all four sheets with correct types", {
+test_that("read_input parses all three sheets with correct types", {
   path <- write_tmp_workbook()
   input <- read_input(path)
 
@@ -44,8 +38,8 @@ test_that("read_input parses all four sheets with correct types", {
   expect_true(is.integer(input$parameters$valuation_year))
   expect_true(is.integer(input$parameters$n_simulations))
 
-  expect_equal(nrow(input$contract), 2)
-  expect_equal(input$contract$deductible[2], 10)
+  # The contract no longer lives in the workbook; the dashboard owns it.
+  expect_null(input$contract)
 })
 
 test_that("read_input accepts a workbook with only the data parameters", {

@@ -55,7 +55,9 @@ Excel input
 
 ## 4. Input Excel format
 
-A single workbook with four sheets.
+A single workbook with three sheets (`losses`, `exposure`, `parameters`). The
+contract structure is no longer a workbook sheet; the dashboard owns it (see
+"Contract structure" below).
 
 ### Sheet `losses`
 | column | type | notes |
@@ -95,16 +97,23 @@ Constraints carried into the dashboard controls: `reporting_threshold <= MT <=
 lowest layer deductible`, and `MT <= s` (with `s = MT` collapsing to a single
 Pareto).
 
-### Sheet `contract`
-One row per XL layer in the program.
+### Contract structure (dashboard, not the workbook)
+The program is built and edited live in the dashboard's "Structure" tab, one row
+per XL layer, with Add layer / Remove buttons. It opens seeded with the built-in
+demo program (`default_contract()` in `R/layers.R`); the headless `run_pricing`
+path takes the same structure via its `contract` argument (defaulting to
+`default_contract()`).
+
 | column | type | notes |
 |--------|------|-------|
 | `deductible` | numeric | attachment point D (C xs D) |
 | `cover` | numeric | layer width C |
 | `n_reinstatements` | integer | number of reinstatements (0 = none) |
-| `reinstatement_cost` | numeric | reinstatement premium as fraction of layer premium (e.g. 1.0 = at 100%) |
 | `aad` | numeric | annual aggregate deductible (0 = none) |
 | `aal` | numeric | annual aggregate limit (blank/0 = unlimited) |
+
+(`reinstatement_cost` was carried in the old workbook sheet but never used by the
+pricer, so it was dropped.)
 
 ## 5. Pre-processing (advanced burning cost, Section 2.2)
 

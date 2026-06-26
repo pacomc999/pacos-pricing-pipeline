@@ -11,3 +11,27 @@ test_that("build_results_table rounds and renames for display", {
   expect_true("Expected loss" %in% names(tbl))
   expect_equal(tbl[["Expected loss"]][1], 4.55)   # rounded to 2 dp
 })
+
+test_that("build_contract_df keeps only the pricing columns in order", {
+  rows <- data.frame(id = 1:2, deductible = c(5, 10), cover = c(5, 10),
+                     n_reinstatements = c(999, 999), aad = c(0, 0), aal = c(0, 0))
+  ct <- build_contract_df(rows)
+  expect_equal(names(ct),
+               c("deductible", "cover", "n_reinstatements", "aad", "aal"))
+  expect_equal(ct$cover, c(5, 10))
+})
+
+test_that("validate_contract rejects empty and invalid programs", {
+  empty <- build_contract_df(data.frame(
+    deductible = numeric(0), cover = numeric(0),
+    n_reinstatements = numeric(0), aad = numeric(0), aal = numeric(0)))
+  expect_match(validate_contract(empty), "at least one")
+
+  zero_cover <- data.frame(deductible = 5, cover = 0,
+                           n_reinstatements = 1, aad = 0, aal = 0)
+  expect_match(validate_contract(zero_cover), "cover")
+
+  good <- data.frame(deductible = 5, cover = 5,
+                     n_reinstatements = 1, aad = 0, aal = 0)
+  expect_null(validate_contract(good))
+})

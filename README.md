@@ -68,18 +68,19 @@ result$results
 ```
 
 ## Input workbook
-The workbook holds the data; the modelling choices are made in the dashboard.
-Four sheets:
+The workbook holds the data; the modelling choices and the contract structure
+are made in the dashboard. Three sheets:
 - `losses`: `year`, `loss`, `line_of_business`
 - `exposure`: `year`, `exposure`
 - `parameters`: `key`, `value` (only the data parameters: `reporting_threshold`,
   `loss_inflation_pa`, `valuation_year`)
-- `contract`: `deductible`, `cover`, `n_reinstatements`, `reinstatement_cost`,
-  `aad`, `aal`
 
 The modelling threshold, splice threshold, frequency model, simulation count,
 loadings, and VaR level are set as controls in the dashboard (not in the file),
-so you can tune them while watching the fit.
+so you can tune them while watching the fit. The reinsurance layers (the
+contract structure) are built on the dashboard's **Structure** tab, where you
+add or remove layers and edit each one's deductible, cover, reinstatements, AAD,
+and AAL.
 
 See `engine/make_example.R` for a complete example.
 
@@ -87,11 +88,14 @@ See `engine/make_example.R` for a complete example.
 1. Upload your workbook (`input.xlsx`, or any file with the same sheets). The
    upload stays loaded if you refresh the page; it is cleared only when you
    close the tool.
-2. On the **Fit** tab, adjust the modelling threshold and splice point while
+2. On the **Structure** tab, build the program: add or remove layers and edit
+   each layer's deductible, cover, reinstatements, AAD, and AAL. It starts with
+   a three-layer demo so you can price straight away.
+3. On the **Fit** tab, adjust the modelling threshold and splice point while
    watching the mean-excess plot (to choose where the tail begins), the fitted
    vs empirical severity, and the live fitted parameters (lambda, alpha, etc.).
-3. Set the frequency model, simulations, and loadings.
-4. Click **Run pricing**; view the per-layer table on the **Pricing** tab and
+4. Set the frequency model, simulations, and loadings.
+5. Click **Run pricing**; view the per-layer table on the **Pricing** tab and
    the simulation-vs-closed-form check on the **Validation** tab.
 5. **Download results** writes `output.xlsx`.
 
