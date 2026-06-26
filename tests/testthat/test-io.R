@@ -41,7 +41,30 @@ test_that("read_input parses all four sheets with correct types", {
   expect_equal(input$parameters$frequency_model, "poisson")
   expect_equal(input$parameters$valuation_year, 2026)
   expect_equal(input$parameters$loss_inflation_pa, 0.02)
+  expect_true(is.integer(input$parameters$valuation_year))
+  expect_true(is.integer(input$parameters$n_simulations))
 
   expect_equal(nrow(input$contract), 2)
   expect_equal(input$contract$deductible[2], 10)
+})
+
+test_that("read_input errors clearly on a missing required parameter", {
+  path <- write_tmp_workbook()
+  wb <- openxlsx::loadWorkbook(path)
+  openxlsx::removeWorksheet(wb, "parameters")
+  openxlsx::addWorksheet(wb, "parameters")
+  openxlsx::writeData(wb, "parameters",
+    data.frame(key = "reporting_threshold", value = "3"))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  expect_error(read_input(path), "Missing required parameter")
+})
+
+test_that("read_input errors clearly when a required sheet is missing", {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses",
+    data.frame(year = 2021, loss = 10, line_of_business = "x"))
+  openxlsx::saveWorkbook(wb, path)
+  expect_error(read_input(path), "missing required sheet")
 })

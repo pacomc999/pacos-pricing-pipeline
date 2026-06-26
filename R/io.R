@@ -1,5 +1,14 @@
 # Reads the four-sheet pricing workbook into a structured list.
 read_input <- function(path) {
+  if (!file.exists(path)) stop("Input workbook not found: ", path)
+  required_sheets <- c("losses", "exposure", "parameters", "contract")
+  present <- readxl::excel_sheets(path)
+  missing <- setdiff(required_sheets, present)
+  if (length(missing) > 0) {
+    stop("Input workbook is missing required sheet(s): ",
+         paste(missing, collapse = ", "))
+  }
+
   losses <- as.data.frame(readxl::read_excel(path, sheet = "losses"))
   exposure <- as.data.frame(readxl::read_excel(path, sheet = "exposure"))
   contract <- as.data.frame(readxl::read_excel(path, sheet = "contract"))
@@ -7,7 +16,15 @@ read_input <- function(path) {
   # Parameters arrive as key/value rows; turn them into a typed named list.
   raw_params <- as.data.frame(readxl::read_excel(path, sheet = "parameters"))
   pv <- setNames(as.character(raw_params$value), raw_params$key)
-  num <- function(k) as.numeric(pv[[k]])
+  num <- function(k) {
+    if (is.null(pv[[k]]) || is.na(pv[[k]])) {
+      stop("Missing required parameter in the 'parameters' sheet: ", k)
+    }
+    as.numeric(pv[[k]])
+  }
+  if (is.null(pv[["frequency_model"]])) {
+    stop("Missing required parameter in the 'parameters' sheet: frequency_model")
+  }
   parameters <- list(
     reporting_threshold = num("reporting_threshold"),
     loss_inflation_pa   = num("loss_inflation_pa"),
@@ -23,6 +40,7 @@ read_input <- function(path) {
 
   losses$loss <- as.numeric(losses$loss)
   losses$year <- as.integer(losses$year)
+  exposure$year <- as.integer(exposure$year)
 
   list(losses = losses, exposure = exposure,
        parameters = parameters, contract = contract)
