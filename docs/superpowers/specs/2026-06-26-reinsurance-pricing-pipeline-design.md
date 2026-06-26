@@ -79,9 +79,10 @@ loss year).
 ### Sheet `parameters`
 | key | example | notes |
 |-----|---------|-------|
-| `reporting_threshold` | 5,000,000 | losses below this are not reported in the data |
+| `reporting_threshold` | 3,000,000 | losses below this are not reported in the data |
 | `loss_inflation_pa` | 0.02 | annual loss inflation used for indexation |
-| `splice_threshold_u` | 5,000,000 | lognormal/Pareto split = modelling threshold; must be >= reporting threshold and <= lowest layer deductible |
+| `modelling_threshold` | 5,000,000 | MT: losses above this enter the model and drive frequency; must satisfy `reporting_threshold <= MT <= lowest layer deductible` |
+| `splice_threshold` | 15,000,000 | s: lognormal body below, Pareto tail above; must satisfy `MT < s` and should sit inside the layer range so the body prices lower layers |
 | `frequency_model` | `poisson` | one of `poisson`, `negbin`, `binomial` |
 | `n_simulations` | 100,000 | Monte Carlo iterations |
 | `valuation_year` | 2026 | year all losses are revalued to |
@@ -107,34 +108,45 @@ One row per XL layer in the program.
    indexed/exposure-adjusted loss to each layer) to use as the sense-check in the
    validation step (Section 9).
 
-## 6. Severity model — spliced lognormal + Pareto
+## 6. Severity model — spliced lognormal + Pareto (two thresholds)
 
-A single coherent distribution split at threshold `u` (= modelling threshold),
-with continuity enforced.
+The severity is modelled **conditional on a loss exceeding the modelling
+threshold MT** (those are the only losses that enter the model). Above MT the
+severity is spliced at a higher point `s` (the splice threshold), with continuity
+enforced. Because `s` sits inside the layer range, lower layers are priced off
+the lognormal body and higher layers off the Pareto tail.
 
-- **Body (X <= u):** lognormal(mu, sigma), fitted by maximum likelihood on the
-  indexed losses at or below `u` (via `fitdistrplus`).
-- **Tail (X > u):** Pareto(x0 = u, alpha), with alpha by MLE
-  `alpha_hat = n / sum(log(x_i / u))` over losses above `u`.
-- **Tail weight:** `w = empirical P(X > u)` = (count of losses > u) / (total count).
-- **Continuity:** the Pareto scale is pinned at `x0 = u` and the branches are
-  weighted by `w` and `1 - w`, so the mixture CDF is continuous at `u`.
+- **Body (MT < X <= s):** lognormal(mu, sigma), fitted by maximum likelihood on
+  the indexed losses in `(MT, s]` (via `fitdistrplus`); used as a lognormal
+  truncated to `(MT, s]` inside the mixture.
+- **Tail (X > s):** Pareto(x0 = s, alpha), with alpha by MLE
+  `alpha_hat = n / sum(log(x_i / s))` over losses above `s`.
+- **Tail weight:** `w = empirical P(X > s | X > MT)` =
+  (count of losses > s) / (count of losses > MT).
+- **Continuity:** `x0 = s` and the branches are weighted by `1 - w` (truncated
+  lognormal body) and `w` (Pareto tail), so the conditional mixture CDF is
+  continuous at `s`.
 
-**Sampling (Monte Carlo).** For each severity draw: draw a uniform `v ~ U(0,1)`;
-if `v > 1 - w` draw from the Pareto tail (inverse-CDF), else draw from the
-lognormal body truncated at `u` (inverse-CDF). This yields draws consistent with
-the fitted mixture.
+Conditional mixture survival function `S(t) = P(X > t | X > MT)`:
+- `t <= MT`: 1
+- `MT < t <= s`: `(1 - w) * (F_ln(s) - F_ln(t)) / (F_ln(s) - F_ln(MT)) + w`
+- `t > s`: `w * (t / s)^(-alpha)`
 
-Special case: if `u` is placed at or below the smallest loss, the body is empty
-and the model collapses to a single Pareto, reproducing the course example
-(useful for cross-checking against the notes).
+**Sampling (Monte Carlo).** Draw a uniform `v ~ U(0,1)`; if `v < w` draw from the
+Pareto tail (inverse-CDF `s * U^(-1/alpha)`), else draw from the lognormal body
+truncated to `(MT, s]` (inverse-CDF on the truncated range).
+
+Special cases that aid validation: setting `s = MT` empties the body and collapses
+the model to a single Pareto, reproducing the course example (notes Table 13).
 
 ## 7. Frequency model
 
 User-selectable, default Poisson. Calibrated from annual counts of losses above
-the modelling threshold `u`.
+the **modelling threshold MT** (the same conditioning as the severity, so
+frequency and severity are coherent: `E[annual layer loss] = E[N] * E[layer cost
+per loss | X > MT]`).
 
-- **Poisson (default):** `lambda_hat` = mean annual count of losses > u.
+- **Poisson (default):** `lambda_hat` = mean annual count of losses > MT.
 - **Negative Binomial:** fit by matching mean and variance (or MLE) on annual
   counts; appropriate only when a systemic risk driver is suspected.
 - **Binomial:** for a finite, known number of risks producing similar events.
@@ -146,8 +158,11 @@ from data; Poisson is the principled default and the others are user overrides.
 
 ### Monte Carlo (core)
 Each iteration of the simulation:
-1. Draw the annual loss count `N` from the fitted frequency distribution.
-2. Draw `N` severities from the spliced severity distribution (Section 6).
+1. Draw the annual loss count `N` from the fitted frequency distribution (counts
+   above MT).
+2. Draw `N` severities from the **full spliced** severity distribution conditional
+   on `X > MT` (Section 6) — so draws can land in either the lognormal body or the
+   Pareto tail.
 3. Apply the contract structure to the year's losses:
    - per-loss layer function `L_{D,C}(x) = min(max(x - D, 0), C)` for each layer;
    - aggregate the layer losses over the year;
@@ -158,16 +173,20 @@ Each iteration of the simulation:
 
 After all iterations, build the empirical aggregate loss distribution per layer.
 
-### Closed-form validation oracle
-In parallel, compute the closed-form expected layer loss and compare to the
+### Validation oracle (simulation-independent)
+In parallel, compute the expected layer loss without sampling and compare to the
 simulated mean (must converge as `n_simulations` grows). Using the Darth Vader
-rule `E[L_{D,C}] = integral_D^{D+C} (1 - F(t)) dt`:
-- **Pareto tail:** `E[L_{D,C}] = (x0^alpha / (1 - alpha)) * ((D+C)^(1-alpha) - D^(1-alpha))`.
-- **Lognormal body:** via limited expected values,
-  `E[X ^ u] = exp(mu + sigma^2/2) * Phi((ln u - mu - sigma^2)/sigma) + u * (1 - Phi((ln u - mu)/sigma))`,
-  and `E[L_{D,C}] = E[X ^ (D+C)] - E[X ^ D]`.
-- Multiply expected severity-to-layer by expected frequency `E[N]` for the
-  expected annual loss to the layer.
+rule `E[L_{D,C}] = integral_D^{D+C} S(t) dt` with the conditional mixture survival
+`S` from Section 6, computed by **deterministic numerical integration** so it
+shares no machinery with the Monte Carlo path (a genuine cross-check). Then
+multiply by expected frequency `E[N]` for the expected annual loss.
+
+For the pure-Pareto region (`D >= s`) the integral has the exact closed form
+`E[L_{D,C}] = w * (s^alpha / (1 - alpha)) * ((D+C)^(1-alpha) - D^(1-alpha))`,
+which is kept as a closed-form unit-test anchor: the numerical integrator must
+match it when the layer sits entirely in the tail. The lognormal limited expected
+value `E[X ^ u] = exp(mu + sigma^2/2) * Phi((ln u - mu - sigma^2)/sigma) + u * (1
+- Phi((ln u - mu)/sigma))` is implemented for body-layer reasoning and v2.
 
 This applies to per-layer expected loss only; aggregate features (AAD/AAL),
 reinstatements, and volatility metrics come from the simulation.
@@ -219,9 +238,11 @@ Each module is independently testable.
 
 - `testthat` unit tests per module.
 - Key invariant: simulated expected layer loss converges to the `validate.R`
-  closed-form value (within Monte Carlo tolerance) for the pure per-layer case.
-- Reproduce the course example (Table 13) by setting `u` low enough to force a
-  single Pareto, and checking expected layer losses against the notes.
+  oracle (within Monte Carlo tolerance), for layers in the body, the tail, or
+  straddling the splice.
+- Reproduce the course example (Table 13) by setting `s = MT` to collapse the
+  body, giving a single Pareto, and checking expected layer losses against the
+  notes.
 - Sense checks per Section 2.8 Step 3e: compare to burning cost; test sensitivity
   to indexation and exposure; check frequency plausibility at attachment and at
   the top of the program.

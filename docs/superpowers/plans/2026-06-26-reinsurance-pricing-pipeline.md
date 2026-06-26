@@ -14,9 +14,10 @@
 - Every module uses `package::function` qualified calls (no `library()` inside `R/` files) so tests can source files without side effects.
 - Coding rules (from CLAUDE.md): never use dashes (em dash, en dash) in visible text or copy; clear variable names; comment each section explaining what it does; short focused functions.
 - Default frequency model is Poisson.
-- Modelling/splice threshold `u` must satisfy `reporting_threshold <= u <= lowest layer deductible`. v1 layers therefore attach at or above `u`; the lognormal body is fitted and displayed but does not affect v1 layer prices.
-- Severity is a spliced distribution: lognormal body (losses `<= u`), Pareto tail (losses `> u`), `x0 = u`, tail weight `= empirical P(X > u)`, mixture CDF continuous at `u`.
-- Closed-form expected layer loss is the validation oracle: simulated mean must converge to it for pure per-layer cases.
+- Two thresholds. Modelling threshold `MT` satisfies `reporting_threshold <= MT <= lowest layer deductible` and drives both frequency and what enters the model. Splice threshold `s` satisfies `MT < s` and should sit inside the layer range so the lognormal body prices lower layers and the Pareto tail prices higher layers.
+- Severity is modelled conditional on `X > MT`, spliced at `s`: lognormal body on `(MT, s]`, Pareto tail on `(s, inf)`, `x0 = s`, tail weight `w = empirical P(X > s | X > MT)`, conditional mixture CDF continuous at `s`.
+- Frequency and severity share the same `X > MT` conditioning, so `E[annual layer loss] = E[N] * E[layer cost per loss | X > MT]`.
+- The validation oracle is the expected layer loss computed by deterministic numerical integration of the conditional survival (simulation-independent); the simulated mean must converge to it. The pure-Pareto closed form is kept as a unit-test anchor.
 - Git commits after every task. Commit messages in present tense, short.
 
 ---
@@ -29,7 +30,7 @@ R/
   layers.R        # apply_layer (shared layer function)
   preprocess.R    # index_losses, exposure_factor, burning_cost
   fit_frequency.R # annual_counts, fit_frequency, sample_frequency
-  fit_severity.R  # fit_pareto_alpha, fit_severity, severity_cdf, sample_tail, sample_severity
+  fit_severity.R  # fit_pareto_alpha, fit_severity, severity_survival, sample_severity
   validate.R      # pareto_layer_ev, lnorm_limited_ev, expected_layer_loss
   simulate.R      # simulate_annual_losses
   price.R         # price_layer, price_program
@@ -162,7 +163,7 @@ git commit -m "Scaffold project structure and test harness"
 - Create: `R/io.R`, `tests/testthat/test-io.R`
 
 **Interfaces:**
-- Produces: `read_input(path)` returns a list with elements `losses` (data.frame: `year`, `loss`, `line_of_business`), `exposure` (data.frame: `year`, `exposure`), `parameters` (named list), `contract` (data.frame: `deductible`, `cover`, `n_reinstatements`, `reinstatement_cost`, `aad`, `aal`). `parameters` contains `reporting_threshold`, `loss_inflation_pa`, `splice_threshold_u`, `frequency_model`, `n_simulations`, `valuation_year`, `loading_ev`, `loading_sd`, `var_level`.
+- Produces: `read_input(path)` returns a list with elements `losses` (data.frame: `year`, `loss`, `line_of_business`), `exposure` (data.frame: `year`, `exposure`), `parameters` (named list), `contract` (data.frame: `deductible`, `cover`, `n_reinstatements`, `reinstatement_cost`, `aad`, `aal`). `parameters` contains `reporting_threshold`, `loss_inflation_pa`, `modelling_threshold`, `splice_threshold`, `frequency_model`, `n_simulations`, `valuation_year`, `loading_ev`, `loading_sd`, `var_level`.
 
 - [ ] **Step 1: Write the failing test `tests/testthat/test-io.R`**
 
@@ -184,10 +185,11 @@ write_tmp_workbook <- function() {
   ))
   openxlsx::addWorksheet(wb, "parameters")
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "splice_threshold_u",
-            "frequency_model", "n_simulations", "valuation_year",
-            "loading_ev", "loading_sd", "var_level"),
-    value = c("5", "0.02", "5", "poisson", "100000", "2026", "0.1", "0.2", "0.99")
+    key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+            "splice_threshold", "frequency_model", "n_simulations",
+            "valuation_year", "loading_ev", "loading_sd", "var_level"),
+    value = c("3", "0.02", "5", "15", "poisson", "100000", "2026",
+              "0.1", "0.2", "0.99")
   ))
   openxlsx::addWorksheet(wb, "contract")
   openxlsx::writeData(wb, "contract", data.frame(
@@ -236,7 +238,8 @@ read_input <- function(path) {
   parameters <- list(
     reporting_threshold = num("reporting_threshold"),
     loss_inflation_pa   = num("loss_inflation_pa"),
-    splice_threshold_u  = num("splice_threshold_u"),
+    modelling_threshold = num("modelling_threshold"),
+    splice_threshold    = num("splice_threshold"),
     frequency_model     = pv[["frequency_model"]],
     n_simulations       = as.integer(num("n_simulations")),
     valuation_year      = as.integer(num("valuation_year")),
@@ -378,7 +381,7 @@ git commit -m "Add layer function, indexation and burning cost"
 - Create: `R/fit_frequency.R`, `tests/testthat/test-fit_frequency.R`
 
 **Interfaces:**
-- Consumes: `losses` (indexed or raw), the observation period from `exposure$year`, threshold `u`.
+- Consumes: `losses` (indexed or raw), the observation period from `exposure$year`, the modelling threshold MT.
 - Produces:
   - `annual_counts(losses, years, threshold)` returns an integer vector of counts of losses above `threshold` for each year in `years` (zero-loss years included).
   - `fit_frequency(counts, model)` returns a list `list(type, params, expected)`. `model` is one of `"poisson"`, `"negbin"`, `"binomial"`. `expected` is `E[N]`.
@@ -479,41 +482,50 @@ git commit -m "Add frequency fitting and sampling"
 - Create: `R/fit_severity.R`, `tests/testthat/test-fit_severity.R`
 
 **Interfaces:**
-- Consumes: indexed losses (numeric vector), threshold `u`.
+- Consumes: indexed loss values (numeric vector), modelling threshold `mt`, splice threshold `s`.
 - Produces:
   - `fit_pareto_alpha(x, x0)` returns the MLE `length(x) / sum(log(x / x0))`.
-  - `fit_severity(loss_values, u)` returns a list `list(u, weight, lnorm = list(meanlog, sdlog), pareto = list(x0, alpha))`. `weight` is the empirical `P(X > u)`. `lnorm` is fitted to `loss_values[loss_values <= u]`; if fewer than two such points exist, `lnorm` is `NULL`.
-  - `sample_tail(fit, n)` returns `n` Pareto draws conditional on exceeding `u` (the severity entering v1 layers).
-  - `severity_cdf(fit, x)` returns the full spliced mixture CDF at `x` (for diagnostics).
-  - `sample_severity(fit, n)` returns `n` draws from the full spliced mixture (for v2 and diagnostics).
+  - `fit_severity(loss_values, mt, s)` returns a list `list(mt, s, weight, lnorm = list(meanlog, sdlog) or NULL, pareto = list(x0 = s, alpha))`. Only losses `> mt` are modelled. `weight = P(X > s | X > mt)`. `lnorm` is fitted to losses in `(mt, s]`; if fewer than two such points exist, `lnorm` is `NULL`.
+  - `severity_survival(fit, t)` returns the conditional survival `P(X > t | X > mt)` (vectorised) - the function the oracle integrates and diagnostics plot.
+  - `sample_severity(fit, n)` returns `n` draws from the conditional mixture (the severity entering layers): Pareto tail with probability `weight`, truncated lognormal body otherwise.
 
 - [ ] **Step 1: Write the failing test `tests/testthat/test-fit_severity.R`**
 
 ```r
 test_that("fit_pareto_alpha reproduces the notes alpha of 1.184", {
-  x <- c(12, 9.5, 18, 13, 7, 11, 14)   # losses above u = 5
-  alpha <- fit_pareto_alpha(x, x0 = 5)
-  expect_equal(round(alpha, 3), 1.184)
+  x <- c(12, 9.5, 18, 13, 7, 11, 14)   # losses above s = 5
+  expect_equal(round(fit_pareto_alpha(x, x0 = 5), 3), 1.184)
 })
 
-test_that("sample_tail draws stay above u and follow the Pareto tail", {
-  set.seed(42)
-  fit <- list(u = 5, weight = 1,
-              lnorm = list(meanlog = 0, sdlog = 1),
-              pareto = list(x0 = 5, alpha = 1.184))
-  s <- sample_tail(fit, 50000)
-  expect_true(all(s >= 5))
-  # Survival at 10 should be (10/5)^-1.184 = 0.44 (to 2 dp).
-  expect_equal(round(mean(s > 10), 2), 0.44)
+test_that("fit_severity splits body and tail at s, conditional on mt", {
+  # 2 is below mt and dropped; modelled = 9 values; tail (> 15) = 3 -> w = 3/9.
+  loss_values <- c(2, 6, 7, 8, 9, 10, 12, 20, 30, 50)
+  fit <- fit_severity(loss_values, mt = 5, s = 15)
+  expect_equal(round(fit$weight, 3), round(3 / 9, 3))
+  expect_equal(fit$pareto$x0, 15)
+  expect_false(is.null(fit$lnorm))
 })
 
-test_that("severity_cdf is continuous at u", {
-  fit <- list(u = 5, weight = 0.3,
-              lnorm = list(meanlog = log(3), sdlog = 0.5),
-              pareto = list(x0 = 5, alpha = 1.5))
-  below <- severity_cdf(fit, 5 - 1e-6)
-  at    <- severity_cdf(fit, 5)
-  expect_lt(abs(at - below), 1e-3)   # no jump at the splice point
+test_that("severity_survival is 1 at mt, continuous at s, Pareto above s", {
+  fit <- list(mt = 5, s = 15, weight = 0.3,
+              lnorm = list(meanlog = log(8), sdlog = 0.4),
+              pareto = list(x0 = 15, alpha = 1.5))
+  expect_equal(severity_survival(fit, 5), 1)
+  left  <- severity_survival(fit, 15 - 1e-6)
+  right <- severity_survival(fit, 15 + 1e-6)
+  expect_lt(abs(left - right), 1e-3)        # continuous at the splice point
+  # At 30 = 2*s: w * (30/15)^-1.5 = 0.3 * 2^-1.5 = 0.106.
+  expect_equal(round(severity_survival(fit, 30), 3), 0.106)
+})
+
+test_that("sample_severity draws exceed mt and match the tail weight", {
+  set.seed(7)
+  fit <- list(mt = 5, s = 15, weight = 0.3,
+              lnorm = list(meanlog = log(8), sdlog = 0.4),
+              pareto = list(x0 = 15, alpha = 1.5))
+  d <- sample_severity(fit, 50000)
+  expect_true(all(d > 5))
+  expect_equal(round(mean(d > 15), 2), 0.30)
 })
 ```
 
@@ -531,11 +543,13 @@ fit_pareto_alpha <- function(x, x0) {
   length(x) / sum(log(x / x0))
 }
 
-# Fits the spliced severity: lognormal body below u, Pareto tail above u.
-fit_severity <- function(loss_values, u) {
-  body <- loss_values[loss_values <= u]
-  tail <- loss_values[loss_values > u]
-  weight <- length(tail) / length(loss_values)   # empirical P(X > u)
+# Fits the spliced severity conditional on X > mt: lognormal body on (mt, s],
+# Pareto tail on (s, Inf). Continuity at s comes from the mixture weight.
+fit_severity <- function(loss_values, mt, s) {
+  modelled <- loss_values[loss_values > mt]   # only losses above MT are modelled
+  body <- modelled[modelled <= s]             # (mt, s]
+  tail <- modelled[modelled > s]              # (s, Inf)
+  weight <- length(tail) / length(modelled)   # P(X > s | X > mt)
 
   lnorm <- NULL
   if (length(body) >= 2) {
@@ -544,51 +558,48 @@ fit_severity <- function(loss_values, u) {
                   sdlog   = unname(fit$estimate["sdlog"]))
   }
 
-  list(
-    u = u,
-    weight = weight,
-    lnorm = lnorm,
-    pareto = list(x0 = u, alpha = fit_pareto_alpha(tail, u))
-  )
+  list(mt = mt, s = s, weight = weight, lnorm = lnorm,
+       pareto = list(x0 = s, alpha = fit_pareto_alpha(tail, s)))
 }
 
-# Draws n Pareto tail severities (conditional on exceeding u). Inverse CDF:
-# X = x0 * U^(-1/alpha) gives P(X > x) = (x/x0)^(-alpha).
-sample_tail <- function(fit, n) {
-  u <- runif(n)
-  fit$pareto$x0 * u ^ (-1 / fit$pareto$alpha)
-}
-
-# Full spliced mixture CDF (body weighted 1-w, tail weighted w). Continuous at u.
-severity_cdf <- function(fit, x) {
-  w <- fit$weight
-  u <- fit$u
-  alpha <- fit$pareto$alpha
-  # Body contribution: lognormal mass scaled so it reaches (1 - w) at u.
-  body_cdf <- if (!is.null(fit$lnorm)) {
-    raw <- stats::plnorm(pmin(x, u), fit$lnorm$meanlog, fit$lnorm$sdlog)
-    at_u <- stats::plnorm(u, fit$lnorm$meanlog, fit$lnorm$sdlog)
-    (1 - w) * raw / at_u
-  } else {
-    rep(0, length(x))
+# Conditional survival S(t) = P(X > t | X > mt), vectorised over t.
+severity_survival <- function(fit, t) {
+  w <- fit$weight; mt <- fit$mt; s <- fit$s; alpha <- fit$pareto$alpha
+  # Body survival within (mt, s]: fraction of body mass still above t.
+  body_S <- function(tt) {
+    if (is.null(fit$lnorm)) return(rep(0, length(tt)))
+    Fs  <- stats::plnorm(s,  fit$lnorm$meanlog, fit$lnorm$sdlog)
+    Fmt <- stats::plnorm(mt, fit$lnorm$meanlog, fit$lnorm$sdlog)
+    Ft  <- stats::plnorm(tt, fit$lnorm$meanlog, fit$lnorm$sdlog)
+    (Fs - Ft) / (Fs - Fmt)
   }
-  # Tail contribution: 0 below u, then climbs from (1-w) to 1.
-  tail_cdf <- ifelse(x > u, (1 - w) + w * (1 - (x / u) ^ (-alpha)), 0)
-  ifelse(x <= u, body_cdf, tail_cdf)
+  out <- numeric(length(t))
+  below <- t <= mt
+  mid   <- t > mt & t <= s
+  above <- t > s
+  out[below] <- 1
+  out[mid]   <- (1 - w) * body_S(t[mid]) + w
+  out[above] <- w * (t[above] / s) ^ (-alpha)
+  out
 }
 
-# Draws n severities from the full spliced mixture (for diagnostics and v2).
+# Draws n severities from the conditional mixture (the severity entering layers).
 sample_severity <- function(fit, n) {
-  w <- fit$u  # placeholder guard; real weight below
-  w <- fit$weight
-  is_tail <- runif(n) < w
+  is_tail <- stats::runif(n) < fit$weight
   out <- numeric(n)
-  out[is_tail] <- sample_tail(fit, sum(is_tail))
-  if (any(!is_tail) && !is.null(fit$lnorm)) {
-    # Lognormal truncated to (0, u] via inverse CDF on the truncated range.
-    at_u <- stats::plnorm(fit$u, fit$lnorm$meanlog, fit$lnorm$sdlog)
-    u_draw <- runif(sum(!is_tail), 0, at_u)
-    out[!is_tail] <- stats::qlnorm(u_draw, fit$lnorm$meanlog, fit$lnorm$sdlog)
+  # Pareto tail: inverse CDF s * U^(-1/alpha) gives P(X > x) = (x/s)^(-alpha).
+  out[is_tail] <- fit$s * stats::runif(sum(is_tail)) ^ (-1 / fit$pareto$alpha)
+  # Lognormal body truncated to (mt, s]: inverse CDF on the truncated range.
+  n_body <- sum(!is_tail)
+  if (n_body > 0) {
+    if (is.null(fit$lnorm)) {
+      out[!is_tail] <- fit$mt   # degenerate fallback when the body is unfitted
+    } else {
+      Fmt <- stats::plnorm(fit$mt, fit$lnorm$meanlog, fit$lnorm$sdlog)
+      Fs  <- stats::plnorm(fit$s,  fit$lnorm$meanlog, fit$lnorm$sdlog)
+      u_draw <- stats::runif(n_body, Fmt, Fs)
+      out[!is_tail] <- stats::qlnorm(u_draw, fit$lnorm$meanlog, fit$lnorm$sdlog)
+    }
   }
   out
 }
@@ -608,17 +619,17 @@ git commit -m "Add spliced severity fitting and sampling"
 
 ---
 
-### Task 6: Closed-form validation oracle
+### Task 6: Validation oracle (simulation-independent)
 
 **Files:**
 - Create: `R/validate.R`, `tests/testthat/test-validate.R`
 
 **Interfaces:**
-- Consumes: a frequency fit (`expected`), a severity fit (`u`, `pareto$alpha`).
+- Consumes: a frequency fit (`expected`), a severity fit (with `mt`, `s`, `weight`, `pareto$alpha`) plus `severity_survival` from Task 5.
 - Produces:
-  - `pareto_layer_ev(x0, alpha, D, C)` returns the expected loss to layer `C xs D` for a Pareto severity (requires `D >= x0`, `alpha != 1`).
+  - `pareto_layer_ev(x0, alpha, D, C)` returns the closed-form expected loss to layer `C xs D` for a Pareto severity (requires `D >= x0`, `alpha != 1`); kept as a unit-test anchor.
   - `lnorm_limited_ev(meanlog, sdlog, u)` returns `E[min(X, u)]` for a lognormal (used in v2 and for completeness).
-  - `expected_layer_loss(freq_fit, sev_fit, D, C)` returns `freq_fit$expected * pareto_layer_ev(sev_fit$u, sev_fit$pareto$alpha, D, C)`, the closed-form expected annual loss to the layer (valid for `D >= u`).
+  - `expected_layer_loss(freq_fit, sev_fit, D, C)` returns `freq_fit$expected` times the deterministic numerical integral of `severity_survival(sev_fit, t)` over `[D, D+C]`. This is the validation oracle, valid for any `D >= mt` (body and/or tail), and shares no machinery with the Monte Carlo path.
 
 - [ ] **Step 1: Write the failing test `tests/testthat/test-validate.R`**
 
@@ -630,11 +641,25 @@ test_that("pareto_layer_ev reproduces the notes Table 13 severity layer costs", 
   expect_equal(round(pareto_layer_ev(x0, alpha, 20, 10), 2), 1.51)
 })
 
-test_that("expected_layer_loss multiplies by frequency (Table 13 expected sums)", {
+test_that("expected_layer_loss integrates the survival and matches the anchor", {
+  # Body empty (s = mt) so the survival is pure Pareto and the oracle must
+  # equal freq * pareto_layer_ev (Table 13 expected sums).
   freq <- list(expected = 1.4)
-  sev <- list(u = 5, pareto = list(x0 = 5, alpha = 1.184))
-  # 1.4 * 3.25 = 4.55 (notes report 4.56 with rounding)
+  sev <- list(mt = 5, s = 5, weight = 1, lnorm = NULL,
+              pareto = list(x0 = 5, alpha = 1.184))
   expect_equal(round(expected_layer_loss(freq, sev, 5, 5), 2), 4.55)
+  expect_equal(round(expected_layer_loss(freq, sev, 10, 10), 2),
+               round(1.4 * pareto_layer_ev(5, 1.184, 10, 10), 2))
+})
+
+test_that("expected_layer_loss handles a layer that dips into the body", {
+  # Layer 5 xs 5 sits below the splice s = 15, so the body drives most of it.
+  freq <- list(expected = 2)
+  sev <- list(mt = 5, s = 15, weight = 0.3,
+              lnorm = list(meanlog = log(8), sdlog = 0.4),
+              pareto = list(x0 = 15, alpha = 1.5))
+  val <- expected_layer_loss(freq, sev, 5, 5)
+  expect_true(val > 0 && is.finite(val))
 })
 
 test_that("lnorm_limited_ev is bounded above by u and below by the unlimited mean", {
@@ -654,8 +679,9 @@ Expected: FAIL with "could not find function pareto_layer_ev".
 - [ ] **Step 3: Write `R/validate.R`**
 
 ```r
-# Expected loss to layer C xs D for a Pareto(x0, alpha) severity, D >= x0.
+# Closed-form expected loss to layer C xs D for a Pareto(x0, alpha), D >= x0.
 # E[L] = integral_D^{D+C} (t/x0)^{-alpha} dt  (Darth Vader rule, Example 2.45).
+# Kept as the unit-test anchor for the numerical oracle below.
 pareto_layer_ev <- function(x0, alpha, D, C) {
   if (alpha == 1) {
     x0 * (log(D + C) - log(D))
@@ -671,10 +697,12 @@ lnorm_limited_ev <- function(meanlog, sdlog, u) {
     u * (1 - stats::pnorm((log(u) - m) / s))
 }
 
-# Closed-form expected annual loss to a layer (validation oracle, D >= u).
+# Validation oracle: E[N] times the integral of the conditional survival over
+# the layer. Deterministic quadrature, independent of the Monte Carlo path.
 expected_layer_loss <- function(freq_fit, sev_fit, D, C) {
-  freq_fit$expected *
-    pareto_layer_ev(sev_fit$pareto$x0, sev_fit$pareto$alpha, D, C)
+  integrand <- function(t) severity_survival(sev_fit, t)
+  layer_ev <- stats::integrate(integrand, lower = D, upper = D + C)$value
+  freq_fit$expected * layer_ev
 }
 ```
 
@@ -788,20 +816,21 @@ test_that("annual_layer_loss applies reinstatement cover, AAD and AAL", {
                                  n_reinstatements = 1, aad = 0, aal = 3), 3)
 })
 
-test_that("price_layer expected loss converges to the closed-form oracle", {
-  # Pure per-layer case (no reinstatement cap, no aggregate features).
+test_that("price_layer expected loss converges to the validation oracle", {
+  # Spliced severity with a real lognormal body; layer 5 xs 5 dips into it.
   set.seed(11)
   freq <- list(type = "poisson", params = list(lambda = 1.4), expected = 1.4)
-  sev <- list(u = 5, weight = 1, lnorm = NULL,
-              pareto = list(x0 = 5, alpha = 1.184))
-  sims <- simulate_annual_losses(freq, function(n) sample_tail(sev, n),
+  sev <- list(mt = 5, s = 15, weight = 0.3,
+              lnorm = list(meanlog = log(8), sdlog = 0.4),
+              pareto = list(x0 = 15, alpha = 1.5))
+  sims <- simulate_annual_losses(freq, function(n) sample_severity(sev, n),
                                  n_sims = 200000, seed = 11)
   layer <- data.frame(deductible = 5, cover = 5,
                       n_reinstatements = 999, reinstatement_cost = 0,
                       aad = 0, aal = 0)
   pp <- list(loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
   priced <- price_layer(sims, layer, pp)
-  oracle <- expected_layer_loss(freq, sev, 5, 5)   # ~4.55
+  oracle <- expected_layer_loss(freq, sev, 5, 5)   # numerical survival integral
   expect_true(abs(priced$expected_loss - oracle) / oracle < 0.02)
 })
 ```
@@ -947,18 +976,22 @@ git commit -m "Add Excel output writer"
 **Interfaces:**
 - Consumes: an input workbook path; everything from earlier tasks.
 - Produces:
-  - `run_pricing(input_path, output_path = NULL, seed = NULL)` reads the workbook, indexes losses, fits frequency and severity, simulates, prices, attaches the closed-form `oracle` and `oracle_delta` columns, optionally writes the output workbook, and returns a list `list(results, fit_frequency, fit_severity, burning_cost, sims)`.
-  - `make_example.R` writes `example_input.xlsx` reproducing the notes example (losses above 5 for 2021 to 2025, u = 5).
+  - `run_pricing(input_path, output_path = NULL, seed = NULL)` reads the workbook, indexes losses, fits frequency (counts above `modelling_threshold`) and the spliced severity, simulates the full conditional severity, prices, attaches the `oracle` and `oracle_delta` columns, optionally writes the output workbook, and returns a list `list(results, fit_frequency, fit_severity, burning_cost, sims)`.
+  - `make_example.R` writes `example_input.xlsx`: a richer dataset with a populated lognormal body and Pareto tail (mt = 5, s = 15) so the demo exercises both pieces.
 
 - [ ] **Step 1: Write `make_example.R`**
 
 ```r
-# Writes example_input.xlsx reproducing the Reinsurance Analytics notes example.
+# Writes example_input.xlsx: a richer dataset that populates both the lognormal
+# body (losses 5 to 15) and the Pareto tail (losses above 15), so the demo
+# exercises the full spliced severity. Layers span body, splice, and tail.
 wb <- openxlsx::createWorkbook()
 openxlsx::addWorksheet(wb, "losses")
 openxlsx::writeData(wb, "losses", data.frame(
-  year = c(2021, 2021, 2023, 2024, 2024, 2024, 2025),
-  loss = c(12, 9.5, 18, 13, 7, 11, 14),
+  year = c(2021, 2021, 2021, 2022, 2022, 2023, 2023, 2023,
+           2024, 2024, 2024, 2024, 2024, 2025, 2025, 2025, 2025),
+  loss = c(6, 8, 22, 7, 35, 9, 11, 18,
+           6, 7, 13, 28, 45, 8, 10, 16, 60),
   line_of_business = "fire"
 ))
 openxlsx::addWorksheet(wb, "exposure")
@@ -967,14 +1000,15 @@ openxlsx::writeData(wb, "exposure", data.frame(
 ))
 openxlsx::addWorksheet(wb, "parameters")
 openxlsx::writeData(wb, "parameters", data.frame(
-  key = c("reporting_threshold", "loss_inflation_pa", "splice_threshold_u",
-          "frequency_model", "n_simulations", "valuation_year",
-          "loading_ev", "loading_sd", "var_level"),
-  value = c("5", "0", "5", "poisson", "200000", "2025", "0.1", "0.2", "0.99")
+  key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+          "splice_threshold", "frequency_model", "n_simulations",
+          "valuation_year", "loading_ev", "loading_sd", "var_level"),
+  value = c("5", "0.03", "5", "15", "poisson", "200000", "2026",
+            "0.1", "0.2", "0.99")
 ))
 openxlsx::addWorksheet(wb, "contract")
 openxlsx::writeData(wb, "contract", data.frame(
-  deductible = c(5, 10, 20), cover = c(5, 10, 10),
+  deductible = c(5, 10, 20), cover = c(5, 10, 20),
   n_reinstatements = c(999, 999, 999), reinstatement_cost = c(0, 0, 0),
   aad = c(0, 0, 0), aal = c(0, 0, 0)
 ))
@@ -997,11 +1031,14 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   openxlsx::writeData(wb, "exposure", data.frame(
     year = 2021:2025, exposure = rep(100, 5)))
   openxlsx::addWorksheet(wb, "parameters")
+  # splice_threshold = modelling_threshold collapses the body, giving the pure
+  # Pareto model the notes use, so the result must match Table 13.
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "splice_threshold_u",
-            "frequency_model", "n_simulations", "valuation_year",
-            "loading_ev", "loading_sd", "var_level"),
-    value = c("5", "0", "5", "poisson", "200000", "2025", "0.1", "0.2", "0.99")))
+    key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+            "splice_threshold", "frequency_model", "n_simulations",
+            "valuation_year", "loading_ev", "loading_sd", "var_level"),
+    value = c("5", "0", "5", "5", "poisson", "200000", "2025",
+              "0.1", "0.2", "0.99")))
   openxlsx::addWorksheet(wb, "contract")
   openxlsx::writeData(wb, "contract", data.frame(
     deductible = c(5, 10, 20), cover = c(5, 10, 10),
@@ -1038,14 +1075,15 @@ run_pricing <- function(input_path, output_path = NULL, seed = NULL) {
   years <- sort(unique(input$exposure$year))
   counts <- annual_counts(
     data.frame(year = losses$year, loss = losses$loss_indexed),
-    years, params$splice_threshold_u)
+    years, params$modelling_threshold)
   freq <- fit_frequency(counts, params$frequency_model)
 
-  # Fit the spliced severity on the indexed losses.
-  sev <- fit_severity(losses$loss_indexed, params$splice_threshold_u)
+  # Fit the spliced severity (lognormal body, Pareto tail) on the indexed losses.
+  sev <- fit_severity(losses$loss_indexed,
+                      params$modelling_threshold, params$splice_threshold)
 
-  # Simulate: v1 layers attach above u, so the engine samples the Pareto tail.
-  sims <- simulate_annual_losses(freq, function(n) sample_tail(sev, n),
+  # Simulate the full conditional severity, so layers can cut body and/or tail.
+  sims <- simulate_annual_losses(freq, function(n) sample_severity(sev, n),
                                  params$n_simulations, seed)
 
   # Price every layer.
@@ -1064,10 +1102,11 @@ run_pricing <- function(input_path, output_path = NULL, seed = NULL) {
 
   if (!is.null(output_path)) {
     assumptions <- data.frame(
-      key = c("frequency_model", "lambda", "pareto_alpha", "splice_u",
+      key = c("frequency_model", "lambda", "pareto_alpha",
+              "modelling_threshold", "splice_threshold",
               "n_simulations", "valuation_year"),
       value = c(freq$type, round(freq$expected, 4),
-                round(sev$pareto$alpha, 4), sev$u,
+                round(sev$pareto$alpha, 4), sev$mt, sev$s,
                 params$n_simulations, params$valuation_year))
     write_output(output_path, results, assumptions)
   }
@@ -1195,9 +1234,12 @@ server <- function(input, output, session) {
 
   output$sev_plot <- shiny::renderPlot({
     fit <- priced()$fit_severity
-    xs <- seq(fit$u, fit$u * 8, length.out = 200)
-    plot(xs, severity_cdf(fit, xs), type = "l",
-         xlab = "Loss", ylab = "CDF", main = "Fitted spliced severity")
+    xs <- seq(fit$mt, fit$s * 6, length.out = 200)
+    # Plot the fitted conditional CDF (1 - survival); the splice point is marked.
+    plot(xs, 1 - severity_survival(fit, xs), type = "l",
+         xlab = "Loss", ylab = "CDF (conditional on X > MT)",
+         main = "Fitted spliced severity")
+    abline(v = fit$s, lty = 2)
   })
 
   output$download <- shiny::downloadHandler(
@@ -1303,19 +1345,19 @@ git commit -m "Add README and run instructions"
 **Spec coverage:**
 - Excel input (§4) -> Task 2. Excel output (§10) -> Task 9.
 - Pre-processing: indexation + exposure + burning cost (§5) -> Task 3.
-- Spliced severity, continuity (§6) -> Task 5.
-- Frequency Poisson/NegBin/Binomial, default Poisson (§7) -> Task 4.
-- Monte Carlo engine (§8) -> Task 7.
-- Closed-form validation oracle (§8) -> Task 6, wired in Task 10.
+- Spliced severity with two thresholds, continuity at `s` (§6) -> Task 5.
+- Frequency Poisson/NegBin/Binomial, default Poisson, calibrated at MT (§7) -> Task 4.
+- Monte Carlo engine sampling the full conditional severity (§8) -> Task 7, wired in Task 10.
+- Validation oracle by survival integration, Pareto closed-form anchor (§8) -> Task 6, wired in Task 10.
 - Premium principles, RoL, VaR/TVaR (§9) -> Task 8.
 - Dashboard (§10) -> Task 11.
 - Module structure (§11) -> file structure section; one task per module.
-- Validation/testing (§12) -> tests in every task; Table 13 reproduced in Task 10.
+- Validation/testing (§12) -> tests in every task; Table 13 reproduced in Task 10 (with `s = MT`); body-layer convergence in Task 8.
 - Dependencies (§13) -> Task 1 install_deps.R.
-- v2 hooks (§14): `sample_severity` and `lnorm_limited_ev` built and tested but unused in v1 wiring, so proportional/low-layer work is a wiring change.
+- v2 hooks (§14): `lnorm_limited_ev` built and tested for the proportional/full-distribution extension, which becomes a wiring change.
 
-**Refinement noted:** the lognormal body does not affect v1 layer prices because every layer attaches at or above `u`; v1 simulates the Pareto tail and reproduces the notes exactly. The body is still fitted, displayed, and tested for v2. This is consistent across the spec constraint, Task 5, Task 7, Task 10, and the validation oracle in Task 6.
+**Two-threshold design (the lognormal earns its place):** MT drives frequency and what enters the model; the splice `s` sits inside the layer range, so lower layers price off the lognormal body and higher layers off the Pareto tail. Setting `s = MT` collapses to a single Pareto and reproduces the notes. Consistent across the constraints, Task 4 (counts at MT), Task 5 (spliced fit + `severity_survival`), Task 6 (oracle integrates the survival), Task 7/10 (simulate `sample_severity`).
 
-**Placeholder scan:** no TBD/TODO; every code step shows complete code; every test step shows real assertions with numeric expected values drawn from the notes.
+**Placeholder scan:** no TBD/TODO; every code step shows complete code; every test step shows real assertions with numeric expected values (notes figures or hand-computed).
 
-**Type consistency:** `fit_severity` returns `list(u, weight, lnorm, pareto=list(x0, alpha))`, consumed identically in `sample_tail`, `severity_cdf`, `expected_layer_loss`, and `run_pricing`. Frequency fit returns `list(type, params, expected)`, consumed identically in `sample_frequency`, `simulate_annual_losses`, and `expected_layer_loss`. `apply_layer(x, D, C)` used identically in `burning_cost` and `annual_layer_loss`. `run_pricing` returns `list(results, fit_frequency, fit_severity, burning_cost, sims)`, consumed by `app.R`.
+**Type consistency:** `fit_severity` returns `list(mt, s, weight, lnorm, pareto=list(x0, alpha))`, consumed identically in `severity_survival`, `sample_severity`, `expected_layer_loss` (via `severity_survival`), and `run_pricing`. Frequency fit returns `list(type, params, expected)`, consumed identically in `sample_frequency`, `simulate_annual_losses`, and `expected_layer_loss`. `apply_layer(x, D, C)` used identically in `burning_cost` and `annual_layer_loss`. `run_pricing` returns `list(results, fit_frequency, fit_severity, burning_cost, sims)`, consumed by `app.R`.
