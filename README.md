@@ -4,10 +4,19 @@ An R and Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out.
 
 ## Easiest start (Windows)
-Make sure R is installed (https://cran.r-project.org), then **double-click
-`start.bat`**. It installs the dependencies on the first run, generates the
-example workbook if needed, and opens the dashboard in your browser. Keep the
-black window open while you use the tool; close it to stop the dashboard.
+**Double-click `start.bat`.** That is all most users need to do. On the first
+run it will:
+- install R automatically if it is not already on the machine (approve the
+  Windows security prompt and accept the defaults),
+- install the R package dependencies,
+- generate the example workbook,
+- open the dashboard in your browser.
+
+Keep the small black window open while you use the tool; close it to stop the
+dashboard. Loss data stays on the machine and is never uploaded anywhere. The
+first run can take several minutes (downloading R and packages); later runs
+start in seconds. If antivirus or SmartScreen warns about the downloaded R
+installer, it is the official installer from https://cran.r-project.org.
 
 ## Quick start (any platform, command line)
 1. Install R (4.x).
