@@ -4,19 +4,29 @@ An R and Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out.
 
 ## Easiest start (Windows)
-**Double-click `start.bat`.** That is all most users need to do. On the first
-run it will:
-- install R automatically if it is not already on the machine (approve the
-  Windows security prompt and accept the defaults),
-- install the R package dependencies,
-- generate the example workbook,
-- open the dashboard in your browser.
+**Double-click `start.bat`.** It is pure batch (no PowerShell) so it runs on
+locked-down company machines. It finds an existing R install automatically,
+whatever the version and wherever it lives, by checking:
+1. a `R_PATH.txt` file in this folder, if present (see below),
+2. `Rscript` on the PATH,
+3. the Windows registry (where R records its install path),
+4. the usual folders (`Program Files\R`, `Program Files (x86)\R`, and the
+   per-user `Local\Programs\R`), newest version first.
 
-Keep the small black window open while you use the tool; close it to stop the
-dashboard. Loss data stays on the machine and is never uploaded anywhere. The
-first run can take several minutes (downloading R and packages); later runs
-start in seconds. If antivirus or SmartScreen warns about the downloaded R
-installer, it is the official installer from https://cran.r-project.org.
+Then it installs the package dependencies (first run only), generates the
+example workbook, and opens the dashboard in your browser. Keep the small black
+window open while you use the tool; close it to stop the dashboard. Loss data
+stays on the machine and is never uploaded anywhere.
+
+R must already be installed (this launcher does not install it, since company
+machines often block installers). If `start.bat` cannot find R, either install
+R from https://cran.r-project.org or, when R sits in an unusual location,
+create a file named `R_PATH.txt` next to `start.bat` containing the full path
+to `Rscript.exe`, for example:
+
+```
+D:\Tools\R\R-4.5.2\bin\Rscript.exe
+```
 
 ## Quick start (any platform, command line)
 1. Install R (4.x).
