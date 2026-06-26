@@ -648,7 +648,8 @@ test_that("expected_layer_loss integrates the survival and matches the anchor", 
   freq <- list(expected = 1.4)
   sev <- list(mt = 5, s = 5, weight = 1, lnorm = NULL,
               pareto = list(x0 = 5, alpha = 1.184))
-  expect_equal(round(expected_layer_loss(freq, sev, 5, 5), 2), 4.55)
+  # 1.4 * pareto_layer_ev(5, 1.184, 5, 5) = 1.4 * 3.2536 = 4.555 -> 4.56 (Table 13)
+  expect_equal(round(expected_layer_loss(freq, sev, 5, 5), 2), 4.56)
   expect_equal(round(expected_layer_loss(freq, sev, 10, 10), 2),
                round(1.4 * pareto_layer_ev(5, 1.184, 10, 10), 2))
 })
