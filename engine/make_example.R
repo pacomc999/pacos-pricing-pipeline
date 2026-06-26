@@ -16,12 +16,11 @@ openxlsx::writeData(wb, "exposure", data.frame(
   year = 2021:2026, exposure = c(120, 120, 130, 140, 145, 150)
 ))
 openxlsx::addWorksheet(wb, "parameters")
+# Only the data parameters live in the workbook now. The modelling choices
+# (thresholds, frequency model, simulations, loadings) are set in the dashboard.
 openxlsx::writeData(wb, "parameters", data.frame(
-  key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
-          "splice_threshold", "frequency_model", "n_simulations",
-          "valuation_year", "loading_ev", "loading_sd", "var_level"),
-  value = c("5", "0.03", "5", "15", "poisson", "200000", "2026",
-            "0.1", "0.2", "0.99")
+  key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
+  value = c("5", "0.03", "2026")
 ))
 openxlsx::addWorksheet(wb, "contract")
 openxlsx::writeData(wb, "contract", data.frame(

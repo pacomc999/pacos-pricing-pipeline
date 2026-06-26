@@ -55,7 +55,7 @@ Run these from inside the `engine` folder:
 2. Install dependencies: `Rscript install_deps.R`
 3. Generate the input template: `Rscript make_example.R` (writes ../input.xlsx)
 4. Launch the dashboard: `Rscript -e "shiny::runApp('.', launch.browser = TRUE)"`
-5. Upload `input.xlsx`, click Run pricing.
+5. Upload `input.xlsx`, set the thresholds on the Fit tab, then click Run pricing.
 
 ## Pricing without the UI
 From inside the `engine` folder:
@@ -68,16 +68,30 @@ result$results
 ```
 
 ## Input workbook
+The workbook holds the data; the modelling choices are made in the dashboard.
 Four sheets:
 - `losses`: `year`, `loss`, `line_of_business`
 - `exposure`: `year`, `exposure`
-- `parameters`: `key`, `value` (keys: `reporting_threshold`, `loss_inflation_pa`,
-  `modelling_threshold`, `splice_threshold`, `frequency_model`, `n_simulations`,
-  `valuation_year`, `loading_ev`, `loading_sd`, `var_level`)
+- `parameters`: `key`, `value` (only the data parameters: `reporting_threshold`,
+  `loss_inflation_pa`, `valuation_year`)
 - `contract`: `deductible`, `cover`, `n_reinstatements`, `reinstatement_cost`,
   `aad`, `aal`
 
+The modelling threshold, splice threshold, frequency model, simulation count,
+loadings, and VaR level are set as controls in the dashboard (not in the file),
+so you can tune them while watching the fit.
+
 See `engine/make_example.R` for a complete example.
+
+## Using the dashboard
+1. Upload your workbook.
+2. On the **Fit** tab, adjust the modelling threshold and splice point while
+   watching the mean-excess plot (to choose where the tail begins), the fitted
+   vs empirical severity, and the live fitted parameters (lambda, alpha, etc.).
+3. Set the frequency model, simulations, and loadings.
+4. Click **Run pricing**; view the per-layer table on the **Pricing** tab and
+   the simulation-vs-closed-form check on the **Validation** tab.
+5. **Download results** writes `output.xlsx`.
 
 ## Method
 Spliced lognormal plus Pareto severity with two thresholds (a modelling

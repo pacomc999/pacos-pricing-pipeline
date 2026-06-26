@@ -61,3 +61,33 @@ test_that("frequency window excludes the prospective valuation year", {
   res <- run_pricing(path, seed = 1)
   expect_equal(res$fit_frequency$expected, 2.0)   # 6/3, not 6/4
 })
+
+test_that("dashboard-style overrides drive a data-only workbook", {
+  # Workbook carries only the data parameters; modelling choices come as overrides.
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses", data.frame(
+    year = c(2021, 2021, 2023, 2024, 2024, 2024, 2025),
+    loss = c(12, 9.5, 18, 13, 7, 11, 14), line_of_business = "fire"))
+  openxlsx::addWorksheet(wb, "exposure")
+  openxlsx::writeData(wb, "exposure", data.frame(
+    year = 2021:2025, exposure = rep(100, 5)))
+  openxlsx::addWorksheet(wb, "parameters")
+  openxlsx::writeData(wb, "parameters", data.frame(
+    key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
+    value = c("5", "0", "2025")))
+  openxlsx::addWorksheet(wb, "contract")
+  openxlsx::writeData(wb, "contract", data.frame(
+    deductible = c(5, 10, 20), cover = c(5, 10, 10),
+    n_reinstatements = 999, reinstatement_cost = 0, aad = 0, aal = 0))
+  openxlsx::saveWorkbook(wb, path)
+
+  overrides <- list(modelling_threshold = 5, splice_threshold = 5,
+                    frequency_model = "poisson", n_simulations = 200000,
+                    loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
+  res <- run_pricing(path, overrides = overrides, seed = 99)$results
+  # Same as the notes Table 13 since overrides reproduce that configuration.
+  expect_true(abs(res$expected_loss[1] - 4.56) < 0.15)
+  expect_true(abs(res$expected_loss[3] - 2.12) < 0.15)
+})

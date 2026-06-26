@@ -18,26 +18,35 @@ read_input <- function(path) {
   pv <- setNames(as.character(raw_params$value), raw_params$key)
   # pv is a named character vector, so check the name exists before subsetting
   # (pv[["missing"]] would throw "subscript out of bounds", not return NULL).
+  # Required parameters describe the data and the valuation basis.
   num <- function(k) {
     if (!k %in% names(pv) || is.na(pv[[k]])) {
       stop("Missing required parameter in the 'parameters' sheet: ", k)
     }
     as.numeric(pv[[k]])
   }
-  if (!"frequency_model" %in% names(pv)) {
-    stop("Missing required parameter in the 'parameters' sheet: frequency_model")
+  # Optional parameters are the modelling choices; the dashboard sets these, so
+  # they may be absent from the workbook (NA means "use the default / the UI").
+  opt_num <- function(k) {
+    if (k %in% names(pv) && !is.na(pv[[k]])) as.numeric(pv[[k]]) else NA_real_
+  }
+  opt_int <- function(k) {
+    v <- opt_num(k); if (is.na(v)) NA_integer_ else as.integer(v)
+  }
+  opt_chr <- function(k) {
+    if (k %in% names(pv) && !is.na(pv[[k]])) pv[[k]] else NA_character_
   }
   parameters <- list(
     reporting_threshold = num("reporting_threshold"),
     loss_inflation_pa   = num("loss_inflation_pa"),
-    modelling_threshold = num("modelling_threshold"),
-    splice_threshold    = num("splice_threshold"),
-    frequency_model     = pv[["frequency_model"]],
-    n_simulations       = as.integer(num("n_simulations")),
     valuation_year      = as.integer(num("valuation_year")),
-    loading_ev          = num("loading_ev"),
-    loading_sd          = num("loading_sd"),
-    var_level           = num("var_level")
+    modelling_threshold = opt_num("modelling_threshold"),
+    splice_threshold    = opt_num("splice_threshold"),
+    frequency_model     = opt_chr("frequency_model"),
+    n_simulations       = opt_int("n_simulations"),
+    loading_ev          = opt_num("loading_ev"),
+    loading_sd          = opt_num("loading_sd"),
+    var_level           = opt_num("var_level")
   )
 
   losses$loss <- as.numeric(losses$loss)

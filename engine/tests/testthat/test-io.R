@@ -48,6 +48,23 @@ test_that("read_input parses all four sheets with correct types", {
   expect_equal(input$contract$deductible[2], 10)
 })
 
+test_that("read_input accepts a workbook with only the data parameters", {
+  path <- write_tmp_workbook()
+  wb <- openxlsx::loadWorkbook(path)
+  openxlsx::removeWorksheet(wb, "parameters")
+  openxlsx::addWorksheet(wb, "parameters")
+  # Only the three required data parameters; modelling choices are set in the UI.
+  openxlsx::writeData(wb, "parameters", data.frame(
+    key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
+    value = c("3", "0.02", "2026")))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+
+  input <- read_input(path)
+  expect_equal(input$parameters$reporting_threshold, 3)
+  expect_true(is.na(input$parameters$modelling_threshold))   # optional, absent
+  expect_true(is.na(input$parameters$frequency_model))
+})
+
 test_that("read_input errors clearly on a missing required parameter", {
   path <- write_tmp_workbook()
   wb <- openxlsx::loadWorkbook(path)

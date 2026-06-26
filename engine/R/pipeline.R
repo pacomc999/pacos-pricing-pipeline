@@ -1,55 +1,100 @@
-# End-to-end pricing: read, index, fit, simulate, price, validate, write.
-run_pricing <- function(input_path, output_path = NULL, seed = NULL) {
-  input <- read_input(input_path)
-  params <- input$parameters
+# Resolves the modelling and pricing settings used for fitting and pricing.
+# Precedence: explicit overrides (from the dashboard) > values in the workbook
+# parameters sheet > built-in defaults. A NA splice threshold means "use the
+# modelling threshold", which collapses the body and gives a single Pareto.
+resolve_settings <- function(parameters, overrides = list()) {
+  defaults <- list(
+    modelling_threshold = parameters$reporting_threshold,
+    splice_threshold    = NA_real_,
+    frequency_model     = "poisson",
+    n_simulations       = 100000L,
+    loading_ev          = 0.1,
+    loading_sd          = 0.2,
+    var_level           = 0.99
+  )
+  pick <- function(k) {
+    o <- overrides[[k]]
+    if (!is.null(o) && !all(is.na(o))) return(o)
+    p <- parameters[[k]]
+    if (!is.null(p) && !all(is.na(p))) return(p)
+    defaults[[k]]
+  }
+  s <- list(
+    modelling_threshold = pick("modelling_threshold"),
+    splice_threshold    = pick("splice_threshold"),
+    frequency_model     = pick("frequency_model"),
+    n_simulations       = as.integer(pick("n_simulations")),
+    loading_ev          = pick("loading_ev"),
+    loading_sd          = pick("loading_sd"),
+    var_level           = pick("var_level")
+  )
+  if (is.na(s$splice_threshold)) s$splice_threshold <- s$modelling_threshold
+  s
+}
 
-  # Pre-process: revalue losses to the valuation year.
-  losses <- index_losses(input$losses, input$exposure, params)
-
-  # Fit frequency at the modelling threshold over the observation period.
-  # Use exposure years up to the latest loss year only: the exposure sheet also
-  # carries the prospective valuation year (needed for the exposure factor),
-  # which has no loss experience and must not dilute the frequency.
+# Fits frequency and the spliced severity. This is the fast part (no Monte
+# Carlo), so the dashboard can call it live as the thresholds change.
+fit_models <- function(input, settings) {
+  losses <- index_losses(input$losses, input$exposure, input$parameters)
+  # Observation window: exposure years up to the latest loss year only (the
+  # prospective valuation year carries exposure but no losses).
   obs_years <- input$exposure$year[input$exposure$year <= max(input$losses$year)]
   years <- sort(unique(obs_years))
   counts <- annual_counts(
     data.frame(year = losses$year, loss = losses$loss_indexed),
-    years, params$modelling_threshold)
-  freq <- fit_frequency(counts, params$frequency_model)
-
-  # Fit the spliced severity (lognormal body, Pareto tail) on the indexed losses.
+    years, settings$modelling_threshold)
+  freq <- fit_frequency(counts, settings$frequency_model)
   sev <- fit_severity(losses$loss_indexed,
-                      params$modelling_threshold, params$splice_threshold)
+                      settings$modelling_threshold, settings$splice_threshold)
+  list(losses = losses, years = years, counts = counts,
+       fit_frequency = freq, fit_severity = sev)
+}
 
-  # Simulate the full conditional severity, so layers can cut body and/or tail.
-  sims <- simulate_annual_losses(freq, function(n) sample_severity(sev, n),
-                                 params$n_simulations, seed)
-
-  # Price every layer.
-  pp <- list(loading_ev = params$loading_ev,
-             loading_sd = params$loading_sd,
-             var_level = params$var_level)
-  results <- price_program(sims, input$contract, pp)
-
+# Simulates and prices the program from fitted models. This is the expensive
+# part, so the dashboard runs it only on demand.
+price_models <- function(fits, contract, settings, seed = NULL) {
+  sims <- simulate_annual_losses(
+    fits$fit_frequency,
+    function(n) sample_severity(fits$fit_severity, n),
+    settings$n_simulations, seed)
+  pp <- list(loading_ev = settings$loading_ev,
+             loading_sd = settings$loading_sd,
+             var_level = settings$var_level)
+  results <- price_program(sims, contract, pp)
   # Attach the closed-form oracle and the simulation delta.
   results$oracle <- vapply(seq_len(nrow(results)), function(i) {
-    expected_layer_loss(freq, sev, results$deductible[i], results$cover[i])
+    expected_layer_loss(fits$fit_frequency, fits$fit_severity,
+                        results$deductible[i], results$cover[i])
   }, numeric(1))
   results$oracle_delta <- results$expected_loss - results$oracle
+  list(results = results, sims = sims)
+}
 
-  bc <- burning_cost(losses, input$contract)
+# End-to-end pricing from a workbook. `overrides` is a named list of modelling
+# settings (as the dashboard supplies); anything omitted falls back to the
+# workbook then to built-in defaults.
+run_pricing <- function(input_path, overrides = list(), output_path = NULL,
+                        seed = NULL) {
+  input <- read_input(input_path)
+  settings <- resolve_settings(input$parameters, overrides)
+  fits <- fit_models(input, settings)
+  priced <- price_models(fits, input$contract, settings, seed)
+  results <- priced$results
+  bc <- burning_cost(fits$losses, input$contract)
 
   if (!is.null(output_path)) {
     assumptions <- data.frame(
       key = c("frequency_model", "lambda", "pareto_alpha",
               "modelling_threshold", "splice_threshold",
               "n_simulations", "valuation_year"),
-      value = c(freq$type, round(freq$expected, 4),
-                round(sev$pareto$alpha, 4), sev$mt, sev$s,
-                params$n_simulations, params$valuation_year))
+      value = c(settings$frequency_model, round(fits$fit_frequency$expected, 4),
+                round(fits$fit_severity$pareto$alpha, 4),
+                settings$modelling_threshold, settings$splice_threshold,
+                settings$n_simulations, input$parameters$valuation_year))
     write_output(output_path, results, assumptions)
   }
 
-  list(results = results, fit_frequency = freq, fit_severity = sev,
-       burning_cost = bc, sims = sims)
+  list(results = results, fit_frequency = fits$fit_frequency,
+       fit_severity = fits$fit_severity, burning_cost = bc,
+       sims = priced$sims, settings = settings)
 }

@@ -69,3 +69,14 @@ sample_severity <- function(fit, n) {
   }
   out
 }
+
+# Empirical mean excess e(u) = mean(X - u | X > u) over a set of thresholds.
+# The standard diagnostic for threshold selection: e(u) is roughly linear in u
+# where a Pareto tail fits, which helps the user pick the modelling/splice point.
+mean_excess <- function(x, thresholds) {
+  me <- vapply(thresholds, function(u) {
+    excess <- x[x > u] - u
+    if (length(excess) == 0) NA_real_ else mean(excess)
+  }, numeric(1))
+  data.frame(threshold = thresholds, mean_excess = me)
+}
