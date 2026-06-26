@@ -10,6 +10,11 @@ fit_severity <- function(loss_values, mt, s) {
   modelled <- loss_values[loss_values > mt]   # only losses above MT are modelled
   body <- modelled[modelled <= s]             # (mt, s]
   tail <- modelled[modelled > s]              # (s, Inf)
+  # The Pareto tail needs data above s; without it alpha is undefined (NaN).
+  if (length(tail) < 1) {
+    stop("No losses above the splice threshold s (", s,
+         "); lower the splice threshold or check the data.")
+  }
   weight <- length(tail) / length(modelled)   # P(X > s | X > mt)
 
   lnorm <- NULL

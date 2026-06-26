@@ -6,8 +6,12 @@ run_pricing <- function(input_path, output_path = NULL, seed = NULL) {
   # Pre-process: revalue losses to the valuation year.
   losses <- index_losses(input$losses, input$exposure, params)
 
-  # Fit frequency at the modelling threshold over the exposure observation period.
-  years <- sort(unique(input$exposure$year))
+  # Fit frequency at the modelling threshold over the observation period.
+  # Use exposure years up to the latest loss year only: the exposure sheet also
+  # carries the prospective valuation year (needed for the exposure factor),
+  # which has no loss experience and must not dilute the frequency.
+  obs_years <- input$exposure$year[input$exposure$year <= max(input$losses$year)]
+  years <- sort(unique(obs_years))
   counts <- annual_counts(
     data.frame(year = losses$year, loss = losses$loss_indexed),
     years, params$modelling_threshold)

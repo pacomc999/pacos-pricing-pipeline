@@ -6,8 +6,9 @@ annual_layer_loss <- function(year_losses, D, C, n_reinstatements, aad, aal) {
   # Total cover available across the year: the layer plus its reinstatements.
   max_cover <- C * (1 + n_reinstatements)
   agg <- min(agg, max_cover)
-  # Annual aggregate deductible removes the first aad of aggregate loss.
-  agg <- max(agg - aad, 0)
+  # Annual aggregate deductible removes the first aad of aggregate loss
+  # (a blank/NA or zero aad means no aggregate deductible).
+  if (!is.na(aad) && aad > 0) agg <- max(agg - aad, 0)
   # Annual aggregate limit caps the aggregate (0 means unlimited).
   if (!is.na(aal) && aal > 0) agg <- min(agg, aal)
   agg

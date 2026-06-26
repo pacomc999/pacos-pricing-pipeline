@@ -32,3 +32,32 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   # Simulated mean should track the closed-form oracle closely.
   expect_true(all(abs(res$oracle_delta) / res$oracle < 0.03))
 })
+
+test_that("frequency window excludes the prospective valuation year", {
+  # 6 losses above mt=5 over 3 observed years (2021-2023) -> lambda = 2.0.
+  # Exposure carries 2024 (valuation year) with no losses; it must not dilute.
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses", data.frame(
+    year = c(2021, 2021, 2022, 2023, 2023, 2023),
+    loss = c(8, 9, 10, 7, 11, 13), line_of_business = "fire"))
+  openxlsx::addWorksheet(wb, "exposure")
+  openxlsx::writeData(wb, "exposure", data.frame(
+    year = 2021:2024, exposure = rep(100, 4)))
+  openxlsx::addWorksheet(wb, "parameters")
+  openxlsx::writeData(wb, "parameters", data.frame(
+    key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+            "splice_threshold", "frequency_model", "n_simulations",
+            "valuation_year", "loading_ev", "loading_sd", "var_level"),
+    value = c("5", "0", "5", "5", "poisson", "1000", "2024",
+              "0.1", "0.2", "0.99")))
+  openxlsx::addWorksheet(wb, "contract")
+  openxlsx::writeData(wb, "contract", data.frame(
+    deductible = 5, cover = 5, n_reinstatements = 999,
+    reinstatement_cost = 0, aad = 0, aal = 0))
+  openxlsx::saveWorkbook(wb, path)
+
+  res <- run_pricing(path, seed = 1)
+  expect_equal(res$fit_frequency$expected, 2.0)   # 6/3, not 6/4
+})

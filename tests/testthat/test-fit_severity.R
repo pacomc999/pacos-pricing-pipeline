@@ -33,3 +33,8 @@ test_that("sample_severity draws exceed mt and match the tail weight", {
   expect_true(all(d > 5))
   expect_equal(round(mean(d > 15), 2), 0.30)
 })
+
+test_that("fit_severity errors when the splice is above every loss", {
+  losses <- c(6, 8, 10, 12)   # all below s = 100, so the Pareto tail is empty
+  expect_error(fit_severity(losses, mt = 5, s = 100), "above the splice")
+})
