@@ -20,3 +20,17 @@ test_that("sample_frequency returns non-negative integers of correct length", {
   expect_true(all(s >= 0))
   expect_equal(abs(mean(s) - 1.4) < 0.2, TRUE)
 })
+
+test_that("fit_frequency guards reject mis-specified distribution choices", {
+  # Negative Binomial needs variance greater than mean (over-dispersion).
+  expect_error(fit_frequency(c(1, 1, 1), "negbin"), "variance greater than mean")
+  # Binomial needs variance smaller than mean (under-dispersion).
+  expect_error(fit_frequency(c(1, 4, 9), "binomial"), "variance smaller than mean")
+  # An unknown model name is rejected clearly.
+  expect_error(fit_frequency(c(1, 2, 3), "weibull"), "Unknown frequency model")
+})
+
+test_that("sample_frequency rejects an unknown fit type", {
+  expect_error(sample_frequency(list(type = "weibull", params = list()), 10),
+               "Unknown frequency type")
+})
