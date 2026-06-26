@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Project-specific guidance for Paco's Pragmatic Pricing Pipeline. This overrides
+Project-specific guidance for Paco's Pricing Pipeline. This overrides
 the workspace CLAUDE.md (which is for the browser game and visualizer projects).
 
 ## What this is

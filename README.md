@@ -1,4 +1,4 @@
-# Paco's Pragmatic Pricing Pipeline
+# Paco's Pricing Pipeline
 
 An R and Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out.

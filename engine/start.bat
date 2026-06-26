@@ -1,5 +1,5 @@
 @echo off
-REM One-click launcher for Paco's Pragmatic Pricing Pipeline.
+REM One-click launcher for Paco's Pricing Pipeline.
 REM Pure batch (no PowerShell) so it works on locked-down company machines.
 REM It finds an existing R install (any version, any location) via the Windows
 REM registry, the PATH, and the usual folders, then opens the dashboard.
@@ -42,7 +42,7 @@ if errorlevel 1 goto :depsfail
 if not exist "..\input.xlsx" "%RSCRIPT%" make_example.R
 
 echo.
-echo Starting Paco's Pragmatic Pricing Pipeline.
+echo Starting Paco's Pricing Pipeline.
 echo A browser tab will open. Use the "Shut down" button in the dashboard (or
 echo just close the browser tab) to stop the tool.
 "%RSCRIPT%" -e "shiny::runApp('.', launch.browser = TRUE)"

@@ -125,7 +125,7 @@ Expected: PASS (1 test), no errors.
 ```markdown
 # CLAUDE.md
 
-Project-specific guidance for Paco's Pragmatic Pricing Pipeline. This overrides
+Project-specific guidance for Paco's Pricing Pipeline. This overrides
 the workspace CLAUDE.md (which is for the browser game and visualizer projects).
 
 ## What this is
@@ -1205,7 +1205,7 @@ build_results_table <- function(priced) {
 }
 
 ui <- shiny::fluidPage(
-  shiny::titlePanel("Paco's Pragmatic Pricing Pipeline"),
+  shiny::titlePanel("Paco's Pricing Pipeline"),
   shiny::sidebarLayout(
     shiny::sidebarPanel(
       shiny::fileInput("file", "Upload pricing workbook (.xlsx)",
@@ -1302,7 +1302,7 @@ git commit -m "Add Shiny dashboard"
 - [ ] **Step 1: Write `README.md`**
 
 ```markdown
-# Paco's Pragmatic Pricing Pipeline
+# Paco's Pricing Pipeline
 
 An R and Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out.

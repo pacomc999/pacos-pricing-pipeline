@@ -40,7 +40,7 @@ build_results_table <- function(priced) {
 .app_state$name <- NULL
 
 ui <- shiny::fluidPage(
-  shiny::titlePanel("Paco's Pragmatic Pricing Pipeline"),
+  shiny::titlePanel("Paco's Pricing Pipeline"),
   shiny::sidebarLayout(
     shiny::sidebarPanel(
       shiny::fileInput("file", "Upload pricing workbook (.xlsx)", accept = ".xlsx"),

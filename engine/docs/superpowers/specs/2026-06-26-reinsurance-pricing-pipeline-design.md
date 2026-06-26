@@ -1,4 +1,4 @@
-# Paco's Pragmatic Pricing Pipeline — Design Spec (v1)
+# Paco's Pricing Pipeline — Design Spec (v1)
 
 Date: 2026-06-26 (updated to reflect the delivered tool)
 Status: Implemented. Sections 4, 9, 10, 11, 13 updated post-build to match the

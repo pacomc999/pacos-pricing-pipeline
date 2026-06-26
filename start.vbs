@@ -1,4 +1,4 @@
-' Hidden launcher for Paco's Pragmatic Pricing Pipeline.
+' Hidden launcher for Paco's Pricing Pipeline.
 ' Double-click this file to start the dashboard with NO console window.
 ' If something goes wrong, it shows a popup explaining what to do.
 ' (If your computer blocks .vbs files, double-click start.bat instead.)
@@ -20,7 +20,7 @@ ret = sh.Run(cmdline, 0, True)
 ' A non-zero exit means setup failed (R missing, packages could not install).
 ' Show the captured messages so the user is not left guessing.
 If ret <> 0 Then
-  msg = "Paco's Pragmatic Pricing Pipeline could not start." & vbCrLf & vbCrLf
+  msg = "Paco's Pricing Pipeline could not start." & vbCrLf & vbCrLf
   If fso.FileExists(logFile) Then
     msg = msg & fso.OpenTextFile(logFile, 1).ReadAll()
   End If
