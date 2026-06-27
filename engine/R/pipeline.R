@@ -35,7 +35,7 @@ resolve_settings <- function(parameters, overrides = list()) {
 # Fits frequency and the spliced severity. This is the fast part (no Monte
 # Carlo), so the dashboard can call it live as the thresholds change.
 fit_models <- function(input, settings) {
-  losses <- index_losses(input$losses, input$exposure, input$parameters)
+  losses <- index_losses(input$losses, input$exposure, input$inflation, input$parameters)
   # Observation window: exposure years up to the latest loss year only (the
   # prospective valuation year carries exposure but no losses).
   obs_years <- input$exposure$year[input$exposure$year <= max(input$losses$year)]
@@ -43,7 +43,11 @@ fit_models <- function(input, settings) {
   counts <- annual_counts(
     data.frame(year = losses$year, loss = losses$loss_indexed),
     years, settings$modelling_threshold)
+  # Frequency is the observed-period rate, scaled to the prospective book: a
+  # larger forward exposure is expected to produce proportionally more claims.
   freq <- fit_frequency(counts, settings$frequency_model)
+  freq <- scale_frequency(freq, exposure_frequency_factor(
+    input$exposure, years, input$parameters$valuation_year))
   sev <- fit_severity(losses$loss_indexed,
                       settings$modelling_threshold, settings$splice_threshold)
   list(losses = losses, years = years, counts = counts,

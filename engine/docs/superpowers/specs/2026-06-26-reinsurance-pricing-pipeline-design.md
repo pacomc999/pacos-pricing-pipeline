@@ -55,9 +55,9 @@ Excel input
 
 ## 4. Input Excel format
 
-A single workbook with three sheets (`losses`, `exposure`, `parameters`). The
-contract structure is no longer a workbook sheet; the dashboard owns it (see
-"Contract structure" below).
+A single workbook with four sheets (`losses`, `exposure`, `inflation`,
+`parameters`). The contract structure is no longer a workbook sheet; the
+dashboard owns it (see "Contract structure" below).
 
 ### Sheet `losses`
 | column | type | notes |
@@ -79,6 +79,18 @@ frequency estimate).
 Used for the exposure-correction factor (exposure in valuation year / exposure in
 loss year).
 
+### Sheet `inflation`
+Loss inflation is a per-year rate, not a single constant.
+| column | type | notes |
+|--------|------|-------|
+| `year` | integer | |
+| `inflation` | numeric | loss inflation experienced during that year (e.g. 0.03 for 3%) |
+
+A loss is in money of its own year, so revaluing it to the valuation year
+compounds the rates of the years *after* it: `factor = prod(1 + inflation_t)`
+for `t = loss_year + 1 .. valuation_year` (see `inflation_factor` in
+`R/preprocess.R`; the product deflates if the valuation year is earlier).
+
 ### Sheet `parameters`
 Only the data parameters live in the workbook. The modelling choices
 (modelling threshold, splice threshold, frequency model, simulations, loadings,
@@ -90,8 +102,9 @@ default (see `resolve_settings`).
 | key | example | notes |
 |-----|---------|-------|
 | `reporting_threshold` | 3,000,000 | losses below this are not reported in the data |
-| `loss_inflation_pa` | 0.02 | annual loss inflation used for indexation |
 | `valuation_year` | 2026 | year all losses are revalued to |
+
+(Loss inflation moved to its own per-year `inflation` sheet, above.)
 
 Constraints carried into the dashboard controls: `reporting_threshold <= MT <=
 lowest layer deductible`, and `MT <= s` (with `s = MT` collapsing to a single
@@ -118,7 +131,8 @@ pricer, so it was dropped.)
 ## 5. Pre-processing (advanced burning cost, Section 2.2)
 
 1. **Indexation (loss inflation).** Revalue each historical loss to the valuation
-   year: `loss * (1 + loss_inflation_pa) ^ (valuation_year - loss_year)`.
+   year by compounding the per-year inflation rates of the years after it:
+   `loss * prod(1 + inflation_t)` for `t = loss_year + 1 .. valuation_year`.
 2. **Exposure correction.** Multiply by `exposure[valuation_year] /
    exposure[loss_year]`.
 3. **Burning cost benchmark.** Compute simple and advanced burning cost (average
@@ -296,3 +310,13 @@ the layer formulas were implemented directly in `validate.R` (closed form plus
 - Loss development / IBNR for long-tail lines.
 - Exposure rating curves for low-data lines.
 - Multi-line-of-business portfolio aggregation.
+
+## To discuss
+
+- **Explain exposure handling in the tool.** Exposure now drives two things:
+  on-levelling historical loss sizes (`exposure_factor`) and scaling the
+  projected claim frequency to the prospective book
+  (`exposure_frequency_factor`). Even if the treatment is correct, a user of the
+  dashboard is not told this is happening. We should decide how to surface it
+  (a note on the Data step, a short methodology panel, or tooltips) so the
+  exposure inputs are not a black box.

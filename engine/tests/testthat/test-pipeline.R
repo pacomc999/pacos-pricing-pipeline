@@ -9,14 +9,17 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   openxlsx::addWorksheet(wb, "exposure")
   openxlsx::writeData(wb, "exposure", data.frame(
     year = 2021:2025, exposure = rep(100, 5)))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2025, inflation = rep(0, 5)))   # zero inflation to match Table 13
   openxlsx::addWorksheet(wb, "parameters")
   # splice_threshold = modelling_threshold collapses the body, giving the pure
   # Pareto model the notes use, so the result must match Table 13.
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+    key = c("reporting_threshold", "modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
-    value = c("5", "0", "5", "5", "poisson", "200000", "2025",
+    value = c("5", "5", "5", "poisson", "200000", "2025",
               "0.1", "0.2", "0.99")))
   openxlsx::saveWorkbook(wb, path)
 
@@ -47,17 +50,48 @@ test_that("frequency window excludes the prospective valuation year", {
   openxlsx::addWorksheet(wb, "exposure")
   openxlsx::writeData(wb, "exposure", data.frame(
     year = 2021:2024, exposure = rep(100, 4)))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2024, inflation = rep(0, 4)))
   openxlsx::addWorksheet(wb, "parameters")
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+    key = c("reporting_threshold", "modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
-    value = c("5", "0", "5", "5", "poisson", "1000", "2024",
+    value = c("5", "5", "5", "poisson", "1000", "2024",
               "0.1", "0.2", "0.99")))
   openxlsx::saveWorkbook(wb, path)
 
   res <- run_pricing(path, seed = 1)   # default contract; frequency is unaffected
   expect_equal(res$fit_frequency$expected, 2.0)   # 6/3, not 6/4
+})
+
+test_that("a growing book scales the projected frequency by exposure", {
+  # Same 6 losses over 3 observed years (lambda 2.0), but the prospective book
+  # (2024) is twice the observed average, so the expected frequency doubles.
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses", data.frame(
+    year = c(2021, 2021, 2022, 2023, 2023, 2023),
+    loss = c(8, 9, 10, 7, 11, 13), line_of_business = "fire"))
+  openxlsx::addWorksheet(wb, "exposure")
+  openxlsx::writeData(wb, "exposure", data.frame(
+    year = 2021:2024, exposure = c(100, 100, 100, 200)))   # forward book = 2x
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2024, inflation = rep(0, 4)))
+  openxlsx::addWorksheet(wb, "parameters")
+  openxlsx::writeData(wb, "parameters", data.frame(
+    key = c("reporting_threshold", "modelling_threshold", "splice_threshold",
+            "frequency_model", "n_simulations", "valuation_year",
+            "loading_ev", "loading_sd", "var_level"),
+    value = c("5", "5", "5", "poisson", "1000", "2024",
+              "0.1", "0.2", "0.99")))
+  openxlsx::saveWorkbook(wb, path)
+
+  res <- run_pricing(path, seed = 1)
+  expect_equal(res$fit_frequency$expected, 4.0)   # 2.0 observed rate x 2.0 growth
 })
 
 test_that("dashboard-style overrides drive a data-only workbook", {
@@ -71,10 +105,13 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   openxlsx::addWorksheet(wb, "exposure")
   openxlsx::writeData(wb, "exposure", data.frame(
     year = 2021:2025, exposure = rep(100, 5)))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2025, inflation = rep(0, 5)))
   openxlsx::addWorksheet(wb, "parameters")
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
-    value = c("5", "0", "2025")))
+    key = c("reporting_threshold", "valuation_year"),
+    value = c("5", "2025")))
   openxlsx::saveWorkbook(wb, path)
 
   contract <- data.frame(

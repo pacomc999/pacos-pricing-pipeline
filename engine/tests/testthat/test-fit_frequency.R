@@ -34,3 +34,20 @@ test_that("sample_frequency rejects an unknown fit type", {
   expect_error(sample_frequency(list(type = "weibull", params = list()), 10),
                "Unknown frequency type")
 })
+
+test_that("scale_frequency scales the mean of a Poisson fit", {
+  fit <- fit_frequency(c(2, 0, 1, 3, 1), "poisson")   # lambda 1.4
+  scaled <- scale_frequency(fit, 2)
+  expect_equal(scaled$expected, 2.8)
+  expect_equal(scaled$params$lambda, 2.8)
+  # A factor of 1 leaves the fit unchanged.
+  expect_equal(scale_frequency(fit, 1)$expected, 1.4)
+})
+
+test_that("exposure_frequency_factor compares forward book to observed average", {
+  exposure <- data.frame(year = 2021:2024, exposure = c(100, 100, 100, 200))
+  # Observed 2021-2023 average 100; forward (2024) book 200 -> factor 2.
+  expect_equal(exposure_frequency_factor(exposure, 2021:2023, 2024), 2)
+  # Missing forward exposure falls back to 1 (no scaling).
+  expect_equal(exposure_frequency_factor(exposure, 2021:2023, 2099), 1)
+})

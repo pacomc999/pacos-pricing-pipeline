@@ -26,6 +26,30 @@ fit_frequency <- function(counts, model = "poisson") {
   }
 }
 
+# Scales a fitted frequency distribution's mean by a factor (e.g. to project the
+# observed-period rate onto a larger or smaller prospective book). Poisson and
+# Negative Binomial scale their mean parameter directly; Binomial scales the
+# number of trials. A factor of 1 returns the fit unchanged.
+scale_frequency <- function(fit, factor) {
+  if (factor == 1) return(fit)
+  switch(fit$type,
+    poisson = {
+      fit$params$lambda <- fit$params$lambda * factor
+      fit$expected <- fit$params$lambda
+    },
+    negbin = {
+      fit$params$mu <- fit$params$mu * factor
+      fit$expected <- fit$params$mu
+    },
+    binomial = {
+      fit$params$size <- max(1L, as.integer(round(fit$params$size * factor)))
+      fit$expected <- fit$params$size * fit$params$prob
+    },
+    stop("Unknown frequency type: ", fit$type)
+  )
+  fit
+}
+
 # Draws n simulated annual counts from a fitted frequency distribution.
 sample_frequency <- function(fit, n) {
   p <- fit$params

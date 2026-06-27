@@ -13,19 +13,23 @@ write_tmp_workbook <- function() {
     year = 2021:2025,
     exposure = c(120, 120, 130, 140, 145)
   ))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2025, inflation = c(0.02, 0.03, 0.025, 0.04, 0.03)
+  ))
   openxlsx::addWorksheet(wb, "parameters")
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "modelling_threshold",
+    key = c("reporting_threshold", "modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
-    value = c("3", "0.02", "5", "15", "poisson", "100000", "2026",
+    value = c("3", "5", "15", "poisson", "100000", "2026",
               "0.1", "0.2", "0.99")
   ))
   openxlsx::saveWorkbook(wb, path)
   path
 }
 
-test_that("read_input parses all three sheets with correct types", {
+test_that("read_input parses all four sheets with correct types", {
   path <- write_tmp_workbook()
   input <- read_input(path)
 
@@ -34,9 +38,13 @@ test_that("read_input parses all three sheets with correct types", {
 
   expect_equal(input$parameters$frequency_model, "poisson")
   expect_equal(input$parameters$valuation_year, 2026)
-  expect_equal(input$parameters$loss_inflation_pa, 0.02)
   expect_true(is.integer(input$parameters$valuation_year))
   expect_true(is.integer(input$parameters$n_simulations))
+
+  # Inflation is a per-year table now, not a single parameter.
+  expect_null(input$parameters$loss_inflation_pa)
+  expect_equal(nrow(input$inflation), 5)
+  expect_equal(input$inflation$inflation[2], 0.03)
 
   # The contract no longer lives in the workbook; the dashboard owns it.
   expect_null(input$contract)
@@ -47,10 +55,10 @@ test_that("read_input accepts a workbook with only the data parameters", {
   wb <- openxlsx::loadWorkbook(path)
   openxlsx::removeWorksheet(wb, "parameters")
   openxlsx::addWorksheet(wb, "parameters")
-  # Only the three required data parameters; modelling choices are set in the UI.
+  # Only the required data parameters; modelling choices are set in the UI.
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "loss_inflation_pa", "valuation_year"),
-    value = c("3", "0.02", "2026")))
+    key = c("reporting_threshold", "valuation_year"),
+    value = c("3", "2026")))
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
 
   input <- read_input(path)

@@ -1,9 +1,10 @@
-# Reads the three-sheet pricing workbook into a structured list. The contract
+# Reads the four-sheet pricing workbook into a structured list. The contract
 # structure no longer lives in the workbook; the dashboard owns it (see
-# default_contract() and run_pricing's contract argument).
+# default_contract() and run_pricing's contract argument). Loss inflation is a
+# per-year rate (its own sheet), not a single constant.
 read_input <- function(path) {
   if (!file.exists(path)) stop("Input workbook not found: ", path)
-  required_sheets <- c("losses", "exposure", "parameters")
+  required_sheets <- c("losses", "exposure", "parameters", "inflation")
   present <- readxl::excel_sheets(path)
   missing <- setdiff(required_sheets, present)
   if (length(missing) > 0) {
@@ -13,6 +14,7 @@ read_input <- function(path) {
 
   losses <- as.data.frame(readxl::read_excel(path, sheet = "losses"))
   exposure <- as.data.frame(readxl::read_excel(path, sheet = "exposure"))
+  inflation <- as.data.frame(readxl::read_excel(path, sheet = "inflation"))
 
   # Parameters arrive as key/value rows; turn them into a typed named list.
   raw_params <- as.data.frame(readxl::read_excel(path, sheet = "parameters"))
@@ -39,7 +41,6 @@ read_input <- function(path) {
   }
   parameters <- list(
     reporting_threshold = num("reporting_threshold"),
-    loss_inflation_pa   = num("loss_inflation_pa"),
     valuation_year      = as.integer(num("valuation_year")),
     modelling_threshold = opt_num("modelling_threshold"),
     splice_threshold    = opt_num("splice_threshold"),
@@ -53,8 +54,11 @@ read_input <- function(path) {
   losses$loss <- as.numeric(losses$loss)
   losses$year <- as.integer(losses$year)
   exposure$year <- as.integer(exposure$year)
+  inflation$year <- as.integer(inflation$year)
+  inflation$inflation <- as.numeric(inflation$inflation)
 
-  list(losses = losses, exposure = exposure, parameters = parameters)
+  list(losses = losses, exposure = exposure,
+       parameters = parameters, inflation = inflation)
 }
 
 # Writes pricing results and the assumptions echo to a two-sheet workbook.

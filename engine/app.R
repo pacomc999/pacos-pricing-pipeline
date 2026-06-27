@@ -184,7 +184,11 @@ ui <- shiny::fluidPage(
       shiny::fluidRow(
         shiny::column(6, shiny::tags$h4("Losses"),
           shiny::tags$div(class = "loss-scroll", shiny::tableOutput("loss_preview"))),
-        shiny::column(6, shiny::tags$h4("Data parameters"), shiny::tableOutput("data_params"))
+        shiny::column(6,
+          shiny::tags$h4("Exposure & inflation by year"),
+          shiny::tags$div(class = "loss-scroll", shiny::tableOutput("year_table")),
+          shiny::tags$h4("Data parameters"),
+          shiny::tableOutput("data_params"))
       ),
       step_nav(next_id = "nav_1_next", next_label = "Next: Model")),
 
@@ -392,13 +396,26 @@ server <- function(input, output, session) {
   # push the rest of the screen down.
   output$loss_preview <- shiny::renderTable(input_data()$losses)
 
+  # Exposure and the per-year loss inflation, side by side per year.
+  output$year_table <- shiny::renderTable({
+    d <- input_data()
+    yt <- merge(d$exposure, d$inflation, by = "year", all = TRUE)
+    yt <- yt[order(yt$year), ]
+    data.frame(
+      Year = as.character(yt$year),
+      Exposure = yt$exposure,
+      `Inflation %` = round(yt$inflation * 100, 2),
+      check.names = FALSE
+    )
+  })
+
   # The data parameters carried by the workbook (read-only here; the modelling
   # choices are set on the Model step, not in the file).
   output$data_params <- shiny::renderTable({
     p <- input_data()$parameters
     data.frame(
-      Parameter = c("Reporting threshold", "Loss inflation p.a.", "Valuation year"),
-      Value = c(p$reporting_threshold, p$loss_inflation_pa, p$valuation_year),
+      Parameter = c("Reporting threshold", "Valuation year"),
+      Value = c(p$reporting_threshold, p$valuation_year),
       check.names = FALSE
     )
   })

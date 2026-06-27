@@ -69,11 +69,14 @@ result$results
 
 ## Input workbook
 The workbook holds the data; the modelling choices and the contract structure
-are made in the dashboard. Three sheets:
+are made in the dashboard. Four sheets:
 - `losses`: `year`, `loss`, `line_of_business`
 - `exposure`: `year`, `exposure`
+- `inflation`: `year`, `inflation` (the per-year loss inflation rate, e.g. 0.03
+  for 3%; a loss is revalued by compounding the rates of the years after it up
+  to the valuation year)
 - `parameters`: `key`, `value` (only the data parameters: `reporting_threshold`,
-  `loss_inflation_pa`, `valuation_year`)
+  `valuation_year`)
 
 The modelling threshold, splice threshold, frequency model, simulation count,
 loadings, and VaR level are set as controls in the dashboard (not in the file),
