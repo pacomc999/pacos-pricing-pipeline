@@ -1,7 +1,10 @@
 # Shiny dashboard for the reinsurance pricing pipeline.
 # All numerical work lives in R/; this file wires the UI to the pipeline.
-# The Excel workbook holds the data; the modelling choices (thresholds,
-# frequency model, simulations, loadings) are set here and previewed live.
+# The UI is a four-step flow (Data -> Model -> Structure -> Price): each step
+# pairs its controls with its own feedback. The steps are clickable, so an
+# expert can jump back to iterate; Back/Next buttons walk the linear path.
+# The Excel workbook holds the data; the modelling choices and the contract
+# structure are set in the dashboard.
 # Run with: Rscript -e "shiny::runApp('.', launch.browser = TRUE)"
 
 # Load every pipeline module (no-op when sourced from a different directory,
@@ -70,53 +73,114 @@ build_results_table <- function(priced) {
 .app_state$data <- NULL
 .app_state$name <- NULL
 
+# Styles the step tabs as a numbered progress strip: the tabs spread evenly
+# across the width, the active step is highlighted, and CSS counters prepend the
+# step number so the labels read "1 Data", "2 Model", etc.
+stepper_css <- shiny::tags$style(shiny::HTML("
+  #step.nav-tabs { display: flex; counter-reset: step; margin-bottom: 20px; }
+  #step.nav-tabs > li { flex: 1; text-align: center; float: none; }
+  #step.nav-tabs > li > a {
+    border-radius: 0; color: #999; font-weight: 600;
+    border-bottom: 3px solid #ddd;
+  }
+  #step.nav-tabs > li > a::before {
+    counter-increment: step; content: counter(step) '  ';
+    display: inline-block; color: #bbb;
+  }
+  #step.nav-tabs > li.active > a,
+  #step.nav-tabs > li.active > a:hover,
+  #step.nav-tabs > li.active > a:focus {
+    color: #18497a; border-bottom: 3px solid #18497a; background: transparent;
+  }
+  #step.nav-tabs > li.active > a::before { color: #18497a; }
+"))
+
+# One Back/Next footer for a step. Either button id may be NULL to omit it.
+step_nav <- function(back_id = NULL, back_label = NULL,
+                     next_id = NULL, next_label = NULL) {
+  shiny::tags$div(
+    style = "margin-top: 20px; display: flex; justify-content: space-between;",
+    if (is.null(back_id)) shiny::tags$span() else
+      shiny::actionButton(back_id, back_label),
+    if (is.null(next_id)) shiny::tags$span() else
+      shiny::actionButton(next_id, next_label, class = "btn-primary")
+  )
+}
+
 ui <- shiny::fluidPage(
-  shiny::titlePanel("Paco's Pricing Pipeline"),
-  shiny::sidebarLayout(
-    shiny::sidebarPanel(
+  stepper_css,
+  # Slim top bar: title on the left, always-visible Shut down on the right.
+  shiny::fluidRow(
+    shiny::column(9, shiny::titlePanel("Paco's Pricing Pipeline")),
+    shiny::column(3, shiny::tags$div(
+      style = "text-align: right; padding-top: 20px;",
+      shiny::actionButton("quit", "Shut down", class = "btn-danger btn-sm"),
+      shiny::helpText("Or close this tab to stop the tool.")
+    ))
+  ),
+  shiny::tabsetPanel(id = "step",
+    # Step 1: load the data and see what came in.
+    shiny::tabPanel("Data", value = "data",
       shiny::fileInput("file", "Upload pricing workbook (.xlsx)", accept = ".xlsx"),
-      shiny::helpText("Your upload stays loaded across page refreshes. Adjust the thresholds and watch the Fit tab update."),
-      shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
-      shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
-      shiny::selectInput("freq", "Frequency model",
-                         choices = c("Poisson" = "poisson",
-                                     "Negative Binomial" = "negbin",
-                                     "Binomial" = "binomial"),
-                         selected = "poisson"),
-      shiny::numericInput("nsim", "Simulations", value = 100000, min = 1000, step = 1000),
-      shiny::numericInput("load_ev", "Loading (expected value)", value = 0.1, step = 0.05),
-      shiny::numericInput("load_sd", "Loading (std dev)", value = 0.2, step = 0.05),
-      shiny::numericInput("var_level", "VaR / TVaR level", value = 0.99, min = 0.5, max = 0.999, step = 0.005),
-      shiny::numericInput("seed", "Random seed", value = 1),
-      shiny::actionButton("run", "Run pricing", class = "btn-primary"),
-      shiny::downloadButton("download", "Download results"),
-      shiny::tags$hr(),
-      shiny::actionButton("quit", "Shut down", class = "btn-danger"),
-      shiny::helpText("Shut down (or just close this browser tab) to stop the tool.")
-    ),
-    shiny::mainPanel(
-      shiny::tabsetPanel(
-        shiny::tabPanel("Structure",
-          shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers, then click Run pricing."),
-          shiny::fluidRow(
-            shiny::column(2, shiny::tags$strong("Deductible")),
-            shiny::column(2, shiny::tags$strong("Cover")),
-            shiny::column(2, shiny::tags$strong("Reinstatements")),
-            shiny::column(2, shiny::tags$strong("AAD")),
-            shiny::column(2, shiny::tags$strong("AAL")),
-            shiny::column(2, "")
-          ),
-          shiny::uiOutput("structure_ui"),
-          shiny::actionButton("add_layer", "Add layer")),
-        shiny::tabPanel("Fit",
-          shiny::helpText("These update live as you change MT and the splice. Red line = MT, blue dashed = splice."),
+      shiny::helpText("Your upload stays loaded across page refreshes."),
+      shiny::uiOutput("data_info"),
+      shiny::fluidRow(
+        shiny::column(6, shiny::tags$h4("Losses"), shiny::tableOutput("loss_preview")),
+        shiny::column(6, shiny::tags$h4("Data parameters"), shiny::tableOutput("data_params"))
+      ),
+      step_nav(next_id = "nav_1_next", next_label = "Next: Model")),
+
+    # Step 2: choose the modelling thresholds while watching the fit.
+    shiny::tabPanel("Model", value = "model",
+      shiny::fluidRow(
+        shiny::column(4,
+          shiny::helpText("Pick where the tail begins. The plots update live. Red line = MT, blue dashed = splice."),
+          shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
+          shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
+          shiny::selectInput("freq", "Frequency model",
+                             choices = c("Poisson" = "poisson",
+                                         "Negative Binomial" = "negbin",
+                                         "Binomial" = "binomial"),
+                             selected = "poisson")),
+        shiny::column(8,
           shiny::plotOutput("me_plot"),
           shiny::plotOutput("sev_plot"),
-          shiny::tableOutput("fit_params")),
-        shiny::tabPanel("Pricing", shiny::tableOutput("results")),
-        shiny::tabPanel("Validation", shiny::tableOutput("validation"))
-      )
-    )
+          shiny::tableOutput("fit_params"))
+      ),
+      step_nav("nav_2_back", "Back: Data", "nav_2_next", "Next: Structure")),
+
+    # Step 3: build the program to price.
+    shiny::tabPanel("Structure", value = "structure",
+      shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers."),
+      shiny::fluidRow(
+        shiny::column(2, shiny::tags$strong("Deductible")),
+        shiny::column(2, shiny::tags$strong("Cover")),
+        shiny::column(2, shiny::tags$strong("Reinstatements")),
+        shiny::column(2, shiny::tags$strong("AAD")),
+        shiny::column(2, shiny::tags$strong("AAL")),
+        shiny::column(2, "")
+      ),
+      shiny::uiOutput("structure_ui"),
+      shiny::actionButton("add_layer", "Add layer"),
+      step_nav("nav_3_back", "Back: Model", "nav_3_next", "Next: Price")),
+
+    # Step 4: set the loadings, run the Monte Carlo, read the price.
+    shiny::tabPanel("Price", value = "price",
+      shiny::fluidRow(
+        shiny::column(4,
+          shiny::numericInput("load_ev", "Loading (expected value)", value = 0.1, step = 0.05),
+          shiny::numericInput("load_sd", "Loading (std dev)", value = 0.2, step = 0.05),
+          shiny::numericInput("var_level", "VaR / TVaR level", value = 0.99, min = 0.5, max = 0.999, step = 0.005),
+          shiny::numericInput("nsim", "Simulations", value = 100000, min = 1000, step = 1000),
+          shiny::numericInput("seed", "Random seed", value = 1),
+          shiny::actionButton("run", "Run pricing", class = "btn-primary"),
+          shiny::tags$br(), shiny::tags$br(),
+          shiny::downloadButton("download", "Download results")),
+        shiny::column(8,
+          shiny::tags$h4("Results"), shiny::tableOutput("results"),
+          shiny::tags$h4("Validation"), shiny::tableOutput("validation"))
+      ),
+      step_nav("nav_4_back", "Back: Structure"))
   )
 )
 
@@ -131,6 +195,17 @@ server <- function(input, output, session) {
     }, delay = 5)
   })
   shiny::observeEvent(input$quit, shiny::stopApp())
+
+  # ---- Step navigation ----
+  # The tabs are clickable (free jumping); these Back/Next buttons just move the
+  # active step for the linear path. Nothing is gated.
+  go_to <- function(step) shiny::updateTabsetPanel(session, "step", selected = step)
+  shiny::observeEvent(input$nav_1_next, go_to("model"))
+  shiny::observeEvent(input$nav_2_back, go_to("data"))
+  shiny::observeEvent(input$nav_2_next, go_to("structure"))
+  shiny::observeEvent(input$nav_3_back, go_to("model"))
+  shiny::observeEvent(input$nav_3_next, go_to("price"))
+  shiny::observeEvent(input$nav_4_back, go_to("structure"))
 
   # ---- Editable contract structure ----
   # The dashboard owns the program now (it is no longer in the workbook). Layers
@@ -243,6 +318,30 @@ server <- function(input, output, session) {
     shiny::validate(shiny::need(!is.null(rv$data),
       "Upload a pricing workbook (.xlsx) to begin."))
     rv$data
+  })
+
+  # ---- Step 1 data preview ----
+  # A short confirmation of what loaded: filename, loss count, and year range.
+  output$data_info <- shiny::renderUI({
+    d <- input_data()
+    yrs <- range(d$losses$year)
+    shiny::tags$p(shiny::tags$strong(rv$name), sprintf(
+      " loaded: %d losses across %d-%d.", nrow(d$losses), yrs[1], yrs[2]))
+  })
+
+  # First rows of the loss list, so the user can sanity-check the upload.
+  output$loss_preview <- shiny::renderTable(
+    utils::head(input_data()$losses, 8))
+
+  # The data parameters carried by the workbook (read-only here; the modelling
+  # choices are set on the Model step, not in the file).
+  output$data_params <- shiny::renderTable({
+    p <- input_data()$parameters
+    data.frame(
+      Parameter = c("Reporting threshold", "Loss inflation p.a.", "Valuation year"),
+      Value = c(p$reporting_threshold, p$loss_inflation_pa, p$valuation_year),
+      check.names = FALSE
+    )
   })
 
   # When a workbook is loaded, seed the controls from its defaults (or built-in
