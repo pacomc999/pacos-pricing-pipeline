@@ -73,29 +73,32 @@ build_results_table <- function(priced) {
 .app_state$data <- NULL
 .app_state$name <- NULL
 
-# Burgundy theme, matching the colour scheme of the Dogs tool (deep burgundy
-# banner, red accent, soft pink-white page, pink-grey borders). Restyles the
-# default Bootstrap look and turns the step tabs into a numbered progress strip.
+# Navy and blue theme. A deep navy banner, a blue accent for primary actions and
+# the active step, and cool neutral surfaces. Red (--error) is reserved for
+# destructive buttons (Shut down, Remove) and error messages, so the accent
+# never competes with the 'something is wrong' signal. Restyles the default
+# Bootstrap look and turns the step tabs into a numbered progress strip.
 app_css <- shiny::tags$style(shiny::HTML("
   :root {
-    --burgundy-deep: #2a0d10; --burgundy-mid: #5a1e24;
-    --accent: #d93a3a; --accent-dark: #b02828;
-    --text-main: #2a1518; --text-muted: #7a6268;
-    --bg-main: #faf5f5; --bg-card: #ffffff; --border: #ecdcdc;
+    --navy-deep: #16233f; --navy-mid: #26395f;
+    --accent: #2f6fd0; --accent-dark: #2357a8;
+    --error: #d93a3a; --error-dark: #b02828;
+    --text-main: #1f2733; --text-muted: #69707c;
+    --bg-main: #f5f7fa; --bg-card: #ffffff; --border: #dde3ec;
   }
   body { background: var(--bg-main); color: var(--text-main);
          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
   .container-fluid { max-width: 1180px; }
-  h4 { color: var(--burgundy-mid); font-weight: 600; }
+  h4 { color: var(--navy-mid); font-weight: 600; }
   .help-block { color: var(--text-muted); }
 
   /* Top banner */
-  #topbar { background: linear-gradient(90deg, var(--burgundy-deep), var(--burgundy-mid));
+  #topbar { background: linear-gradient(90deg, var(--navy-deep), var(--navy-mid));
             border-radius: 8px; padding: 14px 24px; margin: 10px 0 18px;
             display: flex; align-items: center; justify-content: space-between; }
   .topbar-title { color: #fff; font-size: 24px; font-weight: 700; letter-spacing: 2px; }
   .topbar-actions { text-align: right; }
-  .topbar-note { color: #d4a8ae; font-size: 11px; margin-top: 4px; }
+  .topbar-note { color: #aeb9cc; font-size: 11px; margin-top: 4px; }
 
   /* Step tabs as a numbered progress strip */
   #step.nav-tabs { display: flex; counter-reset: step; margin-bottom: 0; border-bottom: none; }
@@ -103,11 +106,11 @@ app_css <- shiny::tags$style(shiny::HTML("
   #step.nav-tabs > li:last-child { margin-right: 0; }
   #step.nav-tabs > li > a {
     border: none; border-radius: 8px 8px 0 0; color: var(--text-muted);
-    font-weight: 600; background: #f1e3e3; margin: 0;
+    font-weight: 600; background: #e9edf3; margin: 0;
   }
-  #step.nav-tabs > li > a:hover { background: #ecd8d8; color: var(--text-main); }
+  #step.nav-tabs > li > a:hover { background: #dde3ec; color: var(--text-main); }
   #step.nav-tabs > li > a::before {
-    counter-increment: step; content: counter(step) '  '; color: #c49aa0;
+    counter-increment: step; content: counter(step) '  '; color: #9aa6b8;
   }
   #step.nav-tabs > li.active > a,
   #step.nav-tabs > li.active > a:hover,
@@ -121,18 +124,20 @@ app_css <- shiny::tags$style(shiny::HTML("
                  border-radius: 0 0 8px 8px; padding: 26px 30px; margin-bottom: 24px; }
 
   /* Buttons. Shiny appends the custom class to the default btn-default, so use
-     two-class selectors to win over .btn-default regardless of source order. */
+     two-class selectors to win over .btn-default regardless of source order.
+     Primary actions are blue; danger buttons stay red so red only ever means
+     'destructive or wrong'. */
   .btn-default { background: #fff; border: 1px solid var(--border); color: var(--text-main); }
-  .btn-default:hover { background: var(--bg-main); border-color: #e0c5c5; }
+  .btn-default:hover { background: var(--bg-main); border-color: #c3cddd; }
   .btn.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn.btn-primary:hover, .btn.btn-primary:focus { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
-  .btn.btn-danger { background: #fff; border: 1px solid var(--accent); color: var(--accent); }
-  .btn.btn-danger:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.btn-danger { background: #fff; border: 1px solid var(--error); color: var(--error); }
+  .btn.btn-danger:hover { background: var(--error); border-color: var(--error); color: #fff; }
   #topbar .btn.btn-danger { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.45); color: #fff; }
-  #topbar .btn.btn-danger:hover { background: var(--accent); border-color: var(--accent); }
+  #topbar .btn.btn-danger:hover { background: var(--error); border-color: var(--error); }
 
   /* Inputs */
-  .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(217,58,58,0.15); }
+  .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(47,111,208,0.15); }
   .progress-bar { background-color: var(--accent); }
 
   /* Tables */
