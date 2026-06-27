@@ -4,3 +4,6 @@
 .Rapp.history
 *.xlsx
 !input.xlsx
+
+# Reference literature is kept locally, never committed (third-party material).
+Literature/

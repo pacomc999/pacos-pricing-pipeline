@@ -6,8 +6,9 @@ the workspace CLAUDE.md (which is for the browser game and visualizer projects).
 ## What this is
 An R + Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out. Methodology follows the
-experience-pricing recipe in Literature/Reinsurance_Analytics_2026_vFeb.pdf
-(Section 2.8), generalised to a spliced lognormal plus Pareto severity.
+experience-pricing recipe in ../Literature/Reinsurance_Analytics_2026_vFeb.pdf
+(Section 2.8), generalised to a spliced lognormal plus Pareto severity. That
+folder is kept locally and is not committed (third-party material).
 
 ## Running
 For end users: double-click `start.vbs` in the parent folder (hidden launch) or
