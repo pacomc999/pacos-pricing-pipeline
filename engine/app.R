@@ -145,6 +145,12 @@ app_css <- shiny::tags$style(shiny::HTML("
     font-size: 11px; letter-spacing: 0.8px; border-bottom: 1px solid var(--border); }
   .table > tbody > tr > td { border-top: 1px dashed var(--border); }
   .table > tbody > tr:hover > td { background: var(--bg-main); }
+
+  /* Scrollable loss list: fixed height, header stays put while scrolling */
+  .loss-scroll { max-height: 320px; overflow-y: auto;
+                 border: 1px solid var(--border); border-radius: 6px; }
+  .loss-scroll table { margin-bottom: 0; }
+  .loss-scroll thead th { position: sticky; top: 0; background: var(--bg-card); }
 "))
 
 # One Back/Next footer for a step. Either button id may be NULL to omit it.
@@ -176,7 +182,8 @@ ui <- shiny::fluidPage(
       shiny::helpText("Your upload stays loaded across page refreshes."),
       shiny::uiOutput("data_info"),
       shiny::fluidRow(
-        shiny::column(6, shiny::tags$h4("Losses"), shiny::tableOutput("loss_preview")),
+        shiny::column(6, shiny::tags$h4("Losses"),
+          shiny::tags$div(class = "loss-scroll", shiny::tableOutput("loss_preview"))),
         shiny::column(6, shiny::tags$h4("Data parameters"), shiny::tableOutput("data_params"))
       ),
       step_nav(next_id = "nav_1_next", next_label = "Next: Model")),
@@ -380,9 +387,10 @@ server <- function(input, output, session) {
       " loaded: %d losses across %d-%d.", nrow(d$losses), yrs[1], yrs[2]))
   })
 
-  # First rows of the loss list, so the user can sanity-check the upload.
-  output$loss_preview <- shiny::renderTable(
-    utils::head(input_data()$losses, 8))
+  # The full loss list, so the user can sanity-check every claim. The table sits
+  # in a fixed-height scrollable box (see .loss-scroll), so a long list does not
+  # push the rest of the screen down.
+  output$loss_preview <- shiny::renderTable(input_data()$losses)
 
   # The data parameters carried by the workbook (read-only here; the modelling
   # choices are set on the Model step, not in the file).
