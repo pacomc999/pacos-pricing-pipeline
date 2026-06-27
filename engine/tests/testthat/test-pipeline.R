@@ -27,7 +27,7 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   # no longer a workbook sheet. These are the three notes Table 13 layers.
   contract <- data.frame(
     deductible = c(5, 10, 20), cover = c(5, 10, 10),
-    n_reinstatements = 999, aad = 0, aal = 0)
+    aad = 0, aal = 0)
 
   res <- run_pricing(path, contract = contract, seed = 99)$results
   # Table 13 expected sums: 4.56, 4.01, 2.12 (within simulation tolerance).
@@ -116,7 +116,7 @@ test_that("dashboard-style overrides drive a data-only workbook", {
 
   contract <- data.frame(
     deductible = c(5, 10, 20), cover = c(5, 10, 10),
-    n_reinstatements = 999, aad = 0, aal = 0)
+    aad = 0, aal = 0)
   overrides <- list(modelling_threshold = 5, splice_threshold = 5,
                     frequency_model = "poisson", n_simulations = 200000,
                     loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)

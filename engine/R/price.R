@@ -1,11 +1,8 @@
 # Reinsured loss for one simulated year, in this order:
-# per-loss layering -> aggregate cover limit from reinstatements -> AAD -> AAL.
-annual_layer_loss <- function(year_losses, D, C, n_reinstatements, aad, aal) {
+# per-loss layering -> AAD -> AAL.
+annual_layer_loss <- function(year_losses, D, C, aad, aal) {
   per_loss <- apply_layer(year_losses, D, C)
   agg <- sum(per_loss)
-  # Total cover available across the year: the layer plus its reinstatements.
-  max_cover <- C * (1 + n_reinstatements)
-  agg <- min(agg, max_cover)
   # Annual aggregate deductible removes the first aad of aggregate loss
   # (a blank/NA or zero aad means no aggregate deductible).
   if (!is.na(aad) && aad > 0) agg <- max(agg - aad, 0)
@@ -19,8 +16,7 @@ price_layer <- function(sims, layer_row, premium_params) {
   D <- layer_row$deductible
   C <- layer_row$cover
   annual <- vapply(sims, function(yl) {
-    annual_layer_loss(yl, D, C, layer_row$n_reinstatements,
-                      layer_row$aad, layer_row$aal)
+    annual_layer_loss(yl, D, C, layer_row$aad, layer_row$aal)
   }, numeric(1))
 
   expected_loss <- mean(annual)

@@ -5,15 +5,14 @@ apply_layer <- function(x, D, C) {
 
 # The starting reinsurance program shown in the dashboard when it opens. One row
 # per layer, with exactly the columns the pricer expects (cover excess of
-# deductible, reinstatements, annual aggregate deductible and limit). The
-# contract no longer lives in the workbook, so this is the single source of the
-# default structure for both the dashboard and the headless run_pricing path.
+# deductible, annual aggregate deductible and limit). The contract no longer
+# lives in the workbook, so this is the single source of the default structure
+# for both the dashboard and the headless run_pricing path.
 default_contract <- function() {
   data.frame(
-    deductible       = c(5, 10, 20),
-    cover            = c(5, 10, 20),
-    n_reinstatements = c(999, 999, 999),
-    aad              = c(0, 0, 0),
-    aal              = c(0, 0, 0)
+    deductible = c(5, 10, 20),
+    cover      = c(5, 10, 20),
+    aad        = c(0, 0, 0),
+    aal        = c(0, 0, 0)
   )
 }

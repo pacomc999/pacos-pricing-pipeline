@@ -15,11 +15,10 @@ for (f in list.files("R", pattern = "[.]R$", full.names = TRUE)) source(f)
 # rows, keeping only the pricing columns in the right order (pure, unit-tested).
 build_contract_df <- function(layer_rows) {
   data.frame(
-    deductible       = as.numeric(layer_rows$deductible),
-    cover            = as.numeric(layer_rows$cover),
-    n_reinstatements = as.numeric(layer_rows$n_reinstatements),
-    aad              = as.numeric(layer_rows$aad),
-    aal              = as.numeric(layer_rows$aal)
+    deductible = as.numeric(layer_rows$deductible),
+    cover      = as.numeric(layer_rows$cover),
+    aad        = as.numeric(layer_rows$aad),
+    aal        = as.numeric(layer_rows$aal)
   )
 }
 
@@ -32,9 +31,6 @@ validate_contract <- function(contract) {
   }
   if (any(contract$deductible < 0, na.rm = TRUE)) {
     return("Deductible cannot be negative.")
-  }
-  if (any(contract$n_reinstatements < 0, na.rm = TRUE)) {
-    return("Reinstatements cannot be negative.")
   }
   if (any(contract$aad < 0, na.rm = TRUE) || any(contract$aal < 0, na.rm = TRUE)) {
     return("AAD and AAL cannot be negative.")
@@ -215,9 +211,8 @@ ui <- shiny::fluidPage(
     shiny::tabPanel("Structure", value = "structure",
       shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers."),
       shiny::fluidRow(
-        shiny::column(2, shiny::tags$strong("Deductible")),
-        shiny::column(2, shiny::tags$strong("Cover")),
-        shiny::column(2, shiny::tags$strong("Reinstatements")),
+        shiny::column(3, shiny::tags$strong("Deductible")),
+        shiny::column(3, shiny::tags$strong("Cover")),
         shiny::column(2, shiny::tags$strong("AAD")),
         shiny::column(2, shiny::tags$strong("AAL")),
         shiny::column(2, "")
@@ -284,7 +279,7 @@ server <- function(input, output, session) {
     if (is.null(df) || nrow(df) == 0) return(invisible())
     for (i in seq_len(nrow(df))) {
       id <- df$id[i]
-      for (f in c("deductible", "cover", "n_reinstatements", "aad", "aal")) {
+      for (f in c("deductible", "cover", "aad", "aal")) {
         v <- input[[paste0("layer_", id, "_", f)]]
         if (!is.null(v) && !is.na(v)) df[i, f] <- v
       }
@@ -309,7 +304,7 @@ server <- function(input, output, session) {
     dc <- default_contract()
     dc$id <- seq_len(nrow(dc))
     layers$seq <- nrow(dc)
-    layers$df <- dc[, c("id", "deductible", "cover", "n_reinstatements", "aad", "aal")]
+    layers$df <- dc[, c("id", "deductible", "cover", "aad", "aal")]
     for (id in dc$id) make_remove_observer(id)
   })
 
@@ -318,7 +313,7 @@ server <- function(input, output, session) {
     snapshot_edits()
     layers$seq <- layers$seq + 1L
     new_row <- data.frame(id = layers$seq, deductible = 0, cover = 5,
-                          n_reinstatements = 999, aad = 0, aal = 0)
+                          aad = 0, aal = 0)
     layers$df <- rbind(layers$df, new_row)
     make_remove_observer(layers$seq)
   })
@@ -333,9 +328,8 @@ server <- function(input, output, session) {
       id <- df$id[i]
       nid <- function(f) paste0("layer_", id, "_", f)
       shiny::fluidRow(
-        shiny::column(2, shiny::numericInput(nid("deductible"), NULL, value = df$deductible[i])),
-        shiny::column(2, shiny::numericInput(nid("cover"), NULL, value = df$cover[i])),
-        shiny::column(2, shiny::numericInput(nid("n_reinstatements"), NULL, value = df$n_reinstatements[i])),
+        shiny::column(3, shiny::numericInput(nid("deductible"), NULL, value = df$deductible[i])),
+        shiny::column(3, shiny::numericInput(nid("cover"), NULL, value = df$cover[i])),
         shiny::column(2, shiny::numericInput(nid("aad"), NULL, value = df$aad[i])),
         shiny::column(2, shiny::numericInput(nid("aal"), NULL, value = df$aal[i])),
         shiny::column(2, shiny::actionButton(paste0("remove_", id), "Remove", class = "btn-danger btn-sm"))
@@ -348,8 +342,7 @@ server <- function(input, output, session) {
   contract <- shiny::reactive({
     df <- layers$df
     empty <- data.frame(deductible = numeric(0), cover = numeric(0),
-                        n_reinstatements = numeric(0), aad = numeric(0),
-                        aal = numeric(0))
+                        aad = numeric(0), aal = numeric(0))
     if (is.null(df) || nrow(df) == 0) return(build_contract_df(empty))
     rows <- lapply(seq_len(nrow(df)), function(i) {
       id <- df$id[i]
@@ -358,7 +351,6 @@ server <- function(input, output, session) {
         if (is.null(v)) df[i, f] else v
       }
       data.frame(deductible = val("deductible"), cover = val("cover"),
-                 n_reinstatements = val("n_reinstatements"),
                  aad = val("aad"), aal = val("aal"))
     })
     build_contract_df(do.call(rbind, rows))

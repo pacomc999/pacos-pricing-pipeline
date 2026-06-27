@@ -22,8 +22,8 @@ business can be added later without rework.
 
 ### In scope (v1)
 - Experience pricing of NP per-risk excess-of-loss (XL) programs (multiple layers).
-- Reinstatements and aggregate features (annual aggregate deductible AAD, annual
-  aggregate limit AAL).
+- Aggregate features: annual aggregate deductible (AAD) and annual aggregate
+  limit (AAL). (Reinstatements are not modelled.)
 - Spliced severity: lognormal body + Pareto tail, continuity enforced.
 - Frequency: Poisson (default), Negative Binomial, or Binomial.
 - Loss inflation (indexation) and exposure correction (advanced burning cost).
@@ -121,12 +121,12 @@ path takes the same structure via its `contract` argument (defaulting to
 |--------|------|-------|
 | `deductible` | numeric | attachment point D (C xs D) |
 | `cover` | numeric | layer width C |
-| `n_reinstatements` | integer | number of reinstatements (0 = none) |
 | `aad` | numeric | annual aggregate deductible (0 = none) |
 | `aal` | numeric | annual aggregate limit (blank/0 = unlimited) |
 
-(`reinstatement_cost` was carried in the old workbook sheet but never used by the
-pricer, so it was dropped.)
+(Reinstatements are not modelled: the annual aggregate is the sum of per-loss
+recoveries, then AAD, then AAL. The earlier `reinstatement_cost` and
+`n_reinstatements` columns were dropped.)
 
 ## 5. Pre-processing (advanced burning cost, Section 2.2)
 
@@ -197,10 +197,8 @@ Each iteration of the simulation:
 3. Apply the contract structure to the year's losses:
    - per-loss layer function `L_{D,C}(x) = min(max(x - D, 0), C)` for each layer;
    - aggregate the layer losses over the year;
-   - apply AAD/AAL to the annual aggregate;
-   - apply reinstatement limits (cap reinstated cover, accumulate reinstatement
-     premium).
-4. Record the reinsured loss (and reinstatement premium) for each layer.
+   - apply AAD/AAL to the annual aggregate.
+4. Record the reinsured loss for each layer.
 
 After all iterations, build the empirical aggregate loss distribution per layer.
 
@@ -219,8 +217,8 @@ match it when the layer sits entirely in the tail. The lognormal limited expecte
 value `E[X ^ u] = exp(mu + sigma^2/2) * Phi((ln u - mu - sigma^2)/sigma) + u * (1
 - Phi((ln u - mu)/sigma))` is implemented for body-layer reasoning and v2.
 
-This applies to per-layer expected loss only; aggregate features (AAD/AAL),
-reinstatements, and volatility metrics come from the simulation.
+This applies to per-layer expected loss only; aggregate features (AAD/AAL) and
+volatility metrics come from the simulation.
 
 ## 9. Outputs and premium principles
 
