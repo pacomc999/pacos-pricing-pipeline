@@ -12,7 +12,9 @@ default_contract <- function() {
   data.frame(
     deductible = c(5, 10, 20),
     cover      = c(5, 10, 20),
-    aad        = c(0, 0, 0),
-    aal        = c(0, 0, 0)
+    # NA (blank in the dashboard) means no aggregate deductible / unlimited
+    # aggregate limit. The pricer treats NA and 0 alike (the control is off).
+    aad        = NA_real_,
+    aal        = NA_real_
   )
 }

@@ -11,6 +11,14 @@
 # e.g. tests, where the modules are already loaded by the test helper).
 for (f in list.files("R", pattern = "[.]R$", full.names = TRUE)) source(f)
 
+# A numericInput that shows greyed placeholder text when empty (e.g. "none",
+# "unlimited"). Used for AAD/AAL so a blank field reads clearly instead of
+# defaulting to a misleading 0.
+numeric_input_ph <- function(id, value, placeholder) {
+  ni <- shiny::numericInput(id, NULL, value = value)
+  htmltools::tagQuery(ni)$find("input")$addAttrs(placeholder = placeholder)$allTags()
+}
+
 # Assembles the contract data frame the pricer expects from the edited layer
 # rows, keeping only the pricing columns in the right order (pure, unit-tested).
 build_contract_df <- function(layer_rows) {
@@ -210,6 +218,7 @@ ui <- shiny::fluidPage(
     # Step 3: build the program to price.
     shiny::tabPanel("Structure", value = "structure",
       shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers."),
+      shiny::helpText("Leave AAD blank for no aggregate deductible, and AAL blank for an unlimited aggregate. A blank is not the same as 0."),
       shiny::fluidRow(
         shiny::column(3, shiny::tags$strong("Deductible")),
         shiny::column(3, shiny::tags$strong("Cover")),
@@ -313,7 +322,7 @@ server <- function(input, output, session) {
     snapshot_edits()
     layers$seq <- layers$seq + 1L
     new_row <- data.frame(id = layers$seq, deductible = 0, cover = 5,
-                          aad = 0, aal = 0)
+                          aad = NA_real_, aal = NA_real_)
     layers$df <- rbind(layers$df, new_row)
     make_remove_observer(layers$seq)
   })
@@ -330,8 +339,8 @@ server <- function(input, output, session) {
       shiny::fluidRow(
         shiny::column(3, shiny::numericInput(nid("deductible"), NULL, value = df$deductible[i])),
         shiny::column(3, shiny::numericInput(nid("cover"), NULL, value = df$cover[i])),
-        shiny::column(2, shiny::numericInput(nid("aad"), NULL, value = df$aad[i])),
-        shiny::column(2, shiny::numericInput(nid("aal"), NULL, value = df$aal[i])),
+        shiny::column(2, numeric_input_ph(nid("aad"), df$aad[i], "none")),
+        shiny::column(2, numeric_input_ph(nid("aal"), df$aal[i], "unlimited")),
         shiny::column(2, shiny::actionButton(paste0("remove_", id), "Remove", class = "btn-danger btn-sm"))
       )
     })
