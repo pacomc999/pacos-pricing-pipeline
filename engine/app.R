@@ -155,7 +155,34 @@ app_css <- shiny::tags$style(shiny::HTML("
                  border: 1px solid var(--border); border-radius: 6px; }
   .loss-scroll table { margin-bottom: 0; }
   .loss-scroll thead th { position: sticky; top: 0; background: var(--bg-card); }
+
+  /* Collapsible 'More information' panel at the top of each step */
+  .info-panel { background: #eef3fb; border: 1px solid var(--border);
+                border-left: 4px solid var(--accent); border-radius: 6px;
+                padding: 0 16px; margin-bottom: 22px; }
+  .info-panel > summary { cursor: pointer; padding: 12px 0; font-weight: 600;
+                color: var(--navy-mid); list-style: none; }
+  .info-panel > summary::-webkit-details-marker { display: none; }
+  .info-panel > summary::before { content: 'i'; display: inline-block;
+                width: 18px; height: 18px; line-height: 18px; text-align: center;
+                margin-right: 8px; border-radius: 50%; font-style: italic;
+                font-weight: 700; background: var(--accent); color: #fff; }
+  .info-panel[open] > summary { border-bottom: 1px solid var(--border); }
+  .info-panel .info-body { padding: 12px 2px 16px; color: var(--text-main); font-size: 14px; }
+  .info-panel .info-body p { margin-bottom: 8px; }
+  .info-panel .info-body ul { margin-bottom: 0; padding-left: 20px; }
+  .info-panel .info-body li { margin-bottom: 4px; }
 "))
+
+# A collapsible 'More information' panel for the top of a step. It starts closed
+# so the guided flow stays uncluttered, and opens on click to explain what the
+# tool does and what this step is for. Content is passed as child tags.
+info_panel <- function(...) {
+  shiny::tags$details(class = "info-panel",
+    shiny::tags$summary("More information"),
+    shiny::tags$div(class = "info-body", ...)
+  )
+}
 
 # One Back/Next footer for a step. Either button id may be NULL to omit it.
 step_nav <- function(back_id = NULL, back_label = NULL,
@@ -182,6 +209,23 @@ ui <- shiny::fluidPage(
   shiny::tabsetPanel(id = "step",
     # Step 1: load the data and see what came in.
     shiny::tabPanel("Data", value = "data",
+      info_panel(
+        shiny::tags$p(shiny::tags$strong("What this tool does."),
+          " Paco's Pricing Pipeline prices non-proportional reinsurance from a",
+          " historical loss list. You load the data here, choose how to model it,",
+          " define the layers to price, then run a simulation to get a premium."),
+        shiny::tags$p(shiny::tags$strong("This step"),
+          " loads your Excel workbook. It expects four sheets:"),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
+          shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year."),
+          shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year."),
+          shiny::tags$li(shiny::tags$strong("parameters"), ": the reporting threshold and the valuation year.")
+        ),
+        shiny::tags$p("The losses are revalued to the valuation year using the",
+          " inflation rates, and the claim frequency is scaled by how exposure",
+          " changes. The preview below lets you sanity-check what came in.")
+      ),
       shiny::fileInput("file", "Upload pricing workbook (.xlsx)", accept = ".xlsx"),
       shiny::helpText("Your upload stays loaded across page refreshes."),
       shiny::uiOutput("data_info"),
@@ -198,6 +242,24 @@ ui <- shiny::fluidPage(
 
     # Step 2: choose the modelling thresholds while watching the fit.
     shiny::tabPanel("Model", value = "model",
+      info_panel(
+        shiny::tags$p(shiny::tags$strong("This step"),
+          " fits the two ingredients of the price: how often losses happen",
+          " (frequency) and how big they are (severity)."),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::tags$strong("Frequency model"),
+            ": how the yearly count of losses is distributed (Poisson, Negative Binomial or Binomial)."),
+          shiny::tags$li(shiny::tags$strong("Severity"),
+            ": a lognormal body for ordinary losses spliced onto a Pareto tail for the large ones."),
+          shiny::tags$li(shiny::tags$strong("Modelling threshold (MT)"),
+            ": the loss size where modelling starts; smaller losses are ignored."),
+          shiny::tags$li(shiny::tags$strong("Splice threshold"),
+            ": where the lognormal body hands over to the heavier Pareto tail.")
+        ),
+        shiny::tags$p("The plots update live. The mean excess plot is roughly a",
+          " straight line where a Pareto tail fits well, which helps you choose",
+          " where the tail begins.")
+      ),
       shiny::fluidRow(
         shiny::column(4,
           shiny::helpText("Pick where the tail begins. The plots update live. Red line = MT, blue dashed = splice."),
@@ -217,6 +279,24 @@ ui <- shiny::fluidPage(
 
     # Step 3: build the program to price.
     shiny::tabPanel("Structure", value = "structure",
+      info_panel(
+        shiny::tags$p(shiny::tags$strong("This step"),
+          " defines the reinsurance program to price. Each layer pays a cover",
+          " excess of a deductible. Add or remove as many layers as you like;",
+          " the structure lives here in the dashboard, not in the workbook."),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::tags$strong("Deductible"),
+            ": the loss size where the layer starts paying."),
+          shiny::tags$li(shiny::tags$strong("Cover"),
+            ": the most the layer pays on a single loss."),
+          shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
+            ": the layer absorbs this much in total over the year before it pays anything. Blank means none."),
+          shiny::tags$li(shiny::tags$strong("AAL (annual aggregate limit)"),
+            ": the most the layer pays across the whole year. Blank means unlimited.")
+        ),
+        shiny::tags$p("A blank aggregate is not the same as 0: blank turns the",
+          " control off, while 0 would mean a zero deductible or a zero limit.")
+      ),
       shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers."),
       shiny::helpText("Leave AAD blank for no aggregate deductible, and AAL blank for an unlimited aggregate. A blank is not the same as 0."),
       shiny::fluidRow(
@@ -232,6 +312,27 @@ ui <- shiny::fluidPage(
 
     # Step 4: set the loadings, run the Monte Carlo, read the price.
     shiny::tabPanel("Price", value = "price",
+      info_panel(
+        shiny::tags$p(shiny::tags$strong("This step"),
+          " runs the Monte Carlo simulation: it draws many simulated years from",
+          " the fitted frequency and severity, applies each layer, and turns the",
+          " resulting losses into a premium."),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::tags$strong("Loading (expected value)"),
+            ": a margin added in proportion to the expected loss."),
+          shiny::tags$li(shiny::tags$strong("Loading (std dev)"),
+            ": a margin added in proportion to the loss volatility."),
+          shiny::tags$li(shiny::tags$strong("VaR / TVaR level"),
+            ": the percentile used for the tail risk measures."),
+          shiny::tags$li(shiny::tags$strong("Simulations"),
+            ": more simulations give a smoother result but take longer to run."),
+          shiny::tags$li(shiny::tags$strong("Random seed"),
+            ": fixes the random draws so a run is reproducible.")
+        ),
+        shiny::tags$p("Results show the expected loss, risk measures and two",
+          " premiums. Validation compares the simulated expected loss to a",
+          " closed-form figure as a sanity check; small differences are expected.")
+      ),
       shiny::fluidRow(
         shiny::column(4,
           shiny::numericInput("load_ev", "Loading (expected value)", value = 0.1, step = 0.05),
