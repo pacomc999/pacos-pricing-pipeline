@@ -501,8 +501,16 @@ server <- function(input, output, session) {
     ct <- contract()
     msg <- validate_contract(ct)
     shiny::validate(shiny::need(is.null(msg), msg))
-    f <- fit_models(inp, st)
-    price_models(f, ct, st, input$seed)
+    # Show a progress bar through the pricing phases; the Monte Carlo simulation
+    # is the slow step, so the bar sits there the longest.
+    shiny::withProgress(message = "Pricing", value = 0, {
+      shiny::incProgress(0.15, detail = "Fitting frequency and severity")
+      f <- fit_models(inp, st)
+      shiny::incProgress(0.55, detail = "Running Monte Carlo simulation")
+      out <- price_models(f, ct, st, input$seed)
+      shiny::incProgress(0.3, detail = "Summarising results")
+      out
+    })
   })
 
   output$results <- shiny::renderTable(build_results_table(priced()$results))
