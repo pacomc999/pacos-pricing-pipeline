@@ -318,3 +318,14 @@ the layer formulas were implemented directly in `validate.R` (closed form plus
   dashboard is not told this is happening. We should decide how to surface it
   (a note on the Data step, a short methodology panel, or tooltips) so the
   exposure inputs are not a black box.
+
+- **The example-file generator and the dual role of `input.xlsx`.** We generate
+  `input.xlsx` from code (`make_example.R`) so the example data and its styling
+  are reviewable in git and reproducible. The open question is whether this is
+  the right setup, because `input.xlsx` currently wears two hats: it is both the
+  committed example template *and* the working file a user uploads their own data
+  into. Options to weigh tomorrow: keep it as is; rename the committed template
+  to something like `example_input.xlsx` and treat `input.xlsx` purely as the
+  user's working copy; or drop the generator and hand-maintain the workbook
+  (losing the reviewable history and guaranteed styling). Decide which trade-off
+  fits how the tool is actually used and distributed.
