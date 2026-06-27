@@ -73,26 +73,73 @@ build_results_table <- function(priced) {
 .app_state$data <- NULL
 .app_state$name <- NULL
 
-# Styles the step tabs as a numbered progress strip: the tabs spread evenly
-# across the width, the active step is highlighted, and CSS counters prepend the
-# step number so the labels read "1 Data", "2 Model", etc.
-stepper_css <- shiny::tags$style(shiny::HTML("
-  #step.nav-tabs { display: flex; counter-reset: step; margin-bottom: 20px; }
-  #step.nav-tabs > li { flex: 1; text-align: center; float: none; }
-  #step.nav-tabs > li > a {
-    border-radius: 0; color: #999; font-weight: 600;
-    border-bottom: 3px solid #ddd;
+# Burgundy theme, matching the colour scheme of the Dogs tool (deep burgundy
+# banner, red accent, soft pink-white page, pink-grey borders). Restyles the
+# default Bootstrap look and turns the step tabs into a numbered progress strip.
+app_css <- shiny::tags$style(shiny::HTML("
+  :root {
+    --burgundy-deep: #2a0d10; --burgundy-mid: #5a1e24;
+    --accent: #d93a3a; --accent-dark: #b02828;
+    --text-main: #2a1518; --text-muted: #7a6268;
+    --bg-main: #faf5f5; --bg-card: #ffffff; --border: #ecdcdc;
   }
+  body { background: var(--bg-main); color: var(--text-main);
+         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .container-fluid { max-width: 1180px; }
+  h4 { color: var(--burgundy-mid); font-weight: 600; }
+  .help-block { color: var(--text-muted); }
+
+  /* Top banner */
+  #topbar { background: linear-gradient(90deg, var(--burgundy-deep), var(--burgundy-mid));
+            border-radius: 8px; padding: 14px 24px; margin: 10px 0 18px;
+            display: flex; align-items: center; justify-content: space-between; }
+  .topbar-title { color: #fff; font-size: 24px; font-weight: 700; letter-spacing: 2px; }
+  .topbar-actions { text-align: right; }
+  .topbar-note { color: #d4a8ae; font-size: 11px; margin-top: 4px; }
+
+  /* Step tabs as a numbered progress strip */
+  #step.nav-tabs { display: flex; counter-reset: step; margin-bottom: 0; border-bottom: none; }
+  #step.nav-tabs > li { flex: 1; text-align: center; float: none; margin-right: 3px; }
+  #step.nav-tabs > li:last-child { margin-right: 0; }
+  #step.nav-tabs > li > a {
+    border: none; border-radius: 8px 8px 0 0; color: var(--text-muted);
+    font-weight: 600; background: #f1e3e3; margin: 0;
+  }
+  #step.nav-tabs > li > a:hover { background: #ecd8d8; color: var(--text-main); }
   #step.nav-tabs > li > a::before {
-    counter-increment: step; content: counter(step) '  ';
-    display: inline-block; color: #bbb;
+    counter-increment: step; content: counter(step) '  '; color: #c49aa0;
   }
   #step.nav-tabs > li.active > a,
   #step.nav-tabs > li.active > a:hover,
   #step.nav-tabs > li.active > a:focus {
-    color: #18497a; border-bottom: 3px solid #18497a; background: transparent;
+    color: #fff; background: var(--accent); border: none;
   }
-  #step.nav-tabs > li.active > a::before { color: #18497a; }
+  #step.nav-tabs > li.active > a::before { color: #fff; }
+
+  /* Active step content sits in a white card under the tabs */
+  .tab-content { background: var(--bg-card); border: 1px solid var(--border);
+                 border-radius: 0 0 8px 8px; padding: 26px 30px; margin-bottom: 24px; }
+
+  /* Buttons. Shiny appends the custom class to the default btn-default, so use
+     two-class selectors to win over .btn-default regardless of source order. */
+  .btn-default { background: #fff; border: 1px solid var(--border); color: var(--text-main); }
+  .btn-default:hover { background: var(--bg-main); border-color: #e0c5c5; }
+  .btn.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.btn-primary:hover, .btn.btn-primary:focus { background: var(--accent-dark); border-color: var(--accent-dark); color: #fff; }
+  .btn.btn-danger { background: #fff; border: 1px solid var(--accent); color: var(--accent); }
+  .btn.btn-danger:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+  #topbar .btn.btn-danger { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.45); color: #fff; }
+  #topbar .btn.btn-danger:hover { background: var(--accent); border-color: var(--accent); }
+
+  /* Inputs */
+  .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(217,58,58,0.15); }
+  .progress-bar { background-color: var(--accent); }
+
+  /* Tables */
+  .table > thead > tr > th { color: var(--text-muted); text-transform: uppercase;
+    font-size: 11px; letter-spacing: 0.8px; border-bottom: 1px solid var(--border); }
+  .table > tbody > tr > td { border-top: 1px dashed var(--border); }
+  .table > tbody > tr:hover > td { background: var(--bg-main); }
 "))
 
 # One Back/Next footer for a step. Either button id may be NULL to omit it.
@@ -108,15 +155,14 @@ step_nav <- function(back_id = NULL, back_label = NULL,
 }
 
 ui <- shiny::fluidPage(
-  stepper_css,
-  # Slim top bar: title on the left, always-visible Shut down on the right.
-  shiny::fluidRow(
-    shiny::column(9, shiny::titlePanel("Paco's Pricing Pipeline")),
-    shiny::column(3, shiny::tags$div(
-      style = "text-align: right; padding-top: 20px;",
+  app_css,
+  # Burgundy top banner: title on the left, always-visible Shut down on the right.
+  shiny::tags$div(id = "topbar",
+    shiny::tags$div(class = "topbar-title", "Paco's Pricing Pipeline"),
+    shiny::tags$div(class = "topbar-actions",
       shiny::actionButton("quit", "Shut down", class = "btn-danger btn-sm"),
-      shiny::helpText("Or close this tab to stop the tool.")
-    ))
+      shiny::tags$div(class = "topbar-note", "Or close this tab to stop the tool.")
+    )
   ),
   shiny::tabsetPanel(id = "step",
     # Step 1: load the data and see what came in.
