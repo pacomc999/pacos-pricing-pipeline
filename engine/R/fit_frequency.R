@@ -62,3 +62,16 @@ sample_frequency <- function(fit, n) {
     stop("Unknown frequency type: ", fit$type)
   )
 }
+
+# Probability mass function of a fitted frequency model at counts k, vectorised
+# over k: the probability of seeing exactly k claims in a year. Lets the
+# dashboard plot the fitted count distribution against the empirical one.
+frequency_pmf <- function(fit, k) {
+  p <- fit$params
+  switch(fit$type,
+    poisson  = stats::dpois(k, p$lambda),
+    negbin   = stats::dnbinom(k, size = p$size, mu = p$mu),
+    binomial = stats::dbinom(k, p$size, p$prob),
+    stop("Unknown frequency type: ", fit$type)
+  )
+}

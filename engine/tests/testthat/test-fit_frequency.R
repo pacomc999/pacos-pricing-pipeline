@@ -43,6 +43,20 @@ test_that("sample_frequency rejects an unknown fit type", {
                "Unknown frequency type")
 })
 
+test_that("frequency_pmf matches the fitted distribution and sums to one", {
+  fit <- fit_frequency(c(2, 0, 1, 3, 1), "poisson")   # lambda 1.4
+  expect_equal(frequency_pmf(fit, 0:3), stats::dpois(0:3, 1.4))
+  # A PMF is non-negative and (over a wide enough support) sums to one.
+  pmf <- frequency_pmf(fit, 0:50)
+  expect_true(all(pmf >= 0))
+  expect_equal(sum(pmf), 1, tolerance = 1e-6)
+})
+
+test_that("frequency_pmf rejects an unknown fit type", {
+  expect_error(frequency_pmf(list(type = "weibull", params = list()), 0:3),
+               "Unknown frequency type")
+})
+
 test_that("scale_frequency scales the mean of a Poisson fit", {
   fit <- fit_frequency(c(2, 0, 1, 3, 1), "poisson")   # lambda 1.4
   scaled <- scale_frequency(fit, 2)

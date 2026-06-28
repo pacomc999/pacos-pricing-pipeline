@@ -367,6 +367,7 @@ ui <- shiny::fluidPage(
                                            "Binomial" = "binomial"),
                                selected = "poisson")),
           shiny::column(8,
+            shiny::plotOutput("freq_plot"),
             shiny::tableOutput("freq_summary")))
       ),
       # Severity calibration: the splice threshold, the live fit plot, and params.
@@ -741,6 +742,37 @@ server <- function(input, output, session) {
     legend("bottomright", c("Fitted", "Empirical", "Splice threshold"),
            col = c("black", "grey50", "blue"), lty = c(1, 1, 2),
            lwd = 2.5, bty = "n")
+  })
+
+  # Fitted vs empirical frequency: the probability of each yearly claim count,
+  # as side-by-side bars. The fitted PMF is refit on the observed counts
+  # (unscaled), so it shares a basis with the empirical bars instead of the
+  # forward-scaled pricing fit.
+  output$freq_plot <- shiny::renderPlot(bg = "#f4f7fc", {
+    f <- fits()
+    counts <- f$counts
+    fq <- fit_frequency(counts, f$fit_frequency$type)
+    # x range: cover the observed counts and the fitted upper tail.
+    kmax <- max(counts)
+    while (sum(frequency_pmf(fq, 0:kmax)) < 0.999 && kmax < 200) kmax <- kmax + 1
+    ks <- 0:kmax
+    # Empirical mass = fraction of observed years with each count.
+    emp_pmf <- as.numeric(table(factor(counts, levels = ks))) / length(counts)
+    mat <- rbind(Empirical = emp_pmf, Fitted = frequency_pmf(fq, ks))
+    ymax <- max(mat) * 1.1
+    # First pass draws invisible bars to set up the axes and bar positions; then
+    # paint the panel white and redraw the bars on top, so only the margins keep
+    # the card tint.
+    barplot(mat, beside = TRUE, ylim = c(0, ymax), col = NA, border = NA,
+            names.arg = ks, xlab = "Claims per year", ylab = "Probability",
+            main = "Fitted vs empirical frequency")
+    usr <- graphics::par("usr")
+    graphics::rect(usr[1], usr[3], usr[2], usr[4], col = "white", border = NA)
+    barplot(mat, beside = TRUE, col = c("grey70", "#2f6fd0"), border = NA,
+            axes = FALSE, axisnames = FALSE, add = TRUE)
+    graphics::box()
+    legend("topright", c("Empirical", "Fitted"),
+           fill = c("grey70", "#2f6fd0"), border = NA, bty = "n")
   })
 
   # Frequency summary: the model, the forward expected claim count (exposure
