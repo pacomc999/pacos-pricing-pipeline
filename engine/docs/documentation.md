@@ -186,7 +186,7 @@ modules; it contains no pricing mathematics of its own.
 | `layers.R` | the per-loss layer function and the default program |
 | `preprocess.R` | indexation, exposure correction, burning cost |
 | `fit_frequency.R` | fit and scale Poisson, Negative Binomial or Binomial |
-| `fit_severity.R` | fit the spliced lognormal and Pareto, survival, sampler, mean excess |
+| `fit_severity.R` | fit the spliced lognormal and Pareto, survival, sampler |
 | `simulate.R` | Monte Carlo of annual ground-up losses |
 | `price.R` | apply the layers, compute premiums and risk metrics |
 | `validate.R` | closed-form and numerical-integration validation oracle |
@@ -315,10 +315,9 @@ $$
 where $F_{\ln}$ is the lognormal CDF.
 
 **Threshold choice.** Setting $s = MT$ empties the body and collapses the model
-to a single Pareto. The dashboard shows a **mean excess plot**, the empirical
-$e(u) = \mathrm{mean}(X - u \mid X > u)$, which is roughly linear in $u$ where a
-Pareto tail fits well; this helps the user choose where the tail begins. It also
-shows the fitted versus empirical severity CDF.
+to a single Pareto. The dashboard shows the fitted versus empirical severity CDF,
+which updates live as the thresholds move so the user can see how well the fit
+matches the data and choose where the tail begins.
 
 ## Monte Carlo simulation
 

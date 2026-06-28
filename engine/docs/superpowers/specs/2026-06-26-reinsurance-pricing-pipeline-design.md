@@ -268,7 +268,7 @@ sits in `engine/`.
 | `io.R` | read input workbook, write output workbook (`readxl`, `openxlsx`) |
 | `layers.R` | shared `apply_layer(x, D, C)` loss-to-layer function |
 | `preprocess.R` | indexation, exposure correction, burning cost benchmark |
-| `fit_severity.R` | fit spliced lognormal + Pareto; `severity_survival`, sampler, `mean_excess` |
+| `fit_severity.R` | fit spliced lognormal + Pareto; `severity_survival`, sampler |
 | `fit_frequency.R` | fit Poisson / NegBin / Binomial from counts |
 | `simulate.R` | Monte Carlo aggregate loss generation |
 | `price.R` | apply contract structures, compute premium principles and metrics |

@@ -293,13 +293,13 @@ ui <- shiny::fluidPage(
           shiny::tags$li(shiny::tags$strong("Splice threshold"),
             ": where the lognormal body hands over to the heavier Pareto tail.")
         ),
-        shiny::tags$p("The plots update live. The mean excess plot is roughly a",
-          " straight line where a Pareto tail fits well, which helps you choose",
+        shiny::tags$p("The severity plot updates live as you move the thresholds,",
+          " so you can see how well the fitted curve matches the data and choose",
           " where the tail begins.")
       ),
       shiny::fluidRow(
         shiny::column(4,
-          shiny::helpText("Pick where the tail begins. The plots update live. Red line = MT, blue dashed = splice."),
+          shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold."),
           shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
           shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
           shiny::selectInput("freq", "Frequency model",
@@ -308,9 +308,11 @@ ui <- shiny::fluidPage(
                                          "Binomial" = "binomial"),
                              selected = "poisson")),
         shiny::column(8,
-          shiny::plotOutput("me_plot"),
+          shiny::tags$h4("Frequency"),
+          shiny::tableOutput("freq_summary"),
+          shiny::tags$h4("Severity"),
           shiny::plotOutput("sev_plot"),
-          shiny::tableOutput("fit_params"))
+          shiny::tableOutput("sev_params"))
       ),
       step_nav("nav_2_back", "Back: Data", "nav_2_next", "Next: Structure")),
 
@@ -598,18 +600,6 @@ server <- function(input, output, session) {
              error = function(e) shiny::validate(shiny::need(FALSE, conditionMessage(e))))
   })
 
-  output$me_plot <- shiny::renderPlot({
-    x <- fits()$losses$loss_indexed
-    hi <- as.numeric(stats::quantile(x, 0.95))
-    us <- seq(min(x), max(hi, input$mt * 1.01), length.out = 50)
-    me <- mean_excess(x, us)
-    plot(me$threshold, me$mean_excess, type = "l",
-         xlab = "Threshold u", ylab = "Mean excess e(u)",
-         main = "Mean excess plot (roughly linear where a Pareto tail fits)")
-    abline(v = input$mt, col = "red")
-    abline(v = input$s, col = "blue", lty = 2)
-  })
-
   output$sev_plot <- shiny::renderPlot({
     f <- fits()
     fit <- f$fit_severity
@@ -624,15 +614,32 @@ server <- function(input, output, session) {
            col = c("black", "grey50"), lty = 1, bty = "n")
   })
 
-  output$fit_params <- shiny::renderTable({
+  # Frequency summary: the model, the forward expected claim count (exposure
+  # scaled) and the historical basis it was scaled from. Updates live with MT and
+  # the chosen frequency model.
+  output$freq_summary <- shiny::renderTable({
+    f <- fits()
+    fq <- f$fit_frequency
+    model_label <- c(poisson = "Poisson", negbin = "Negative Binomial",
+                     binomial = "Binomial")[[fq$type]]
+    data.frame(
+      Quantity = c("Model", "Expected claims per year",
+                   "Observed average per year", "Years observed"),
+      Value = c(model_label, format(round(fq$expected, 2)),
+                format(round(mean(f$counts), 2)), as.character(length(f$counts))),
+      check.names = FALSE
+    )
+  })
+
+  output$sev_params <- shiny::renderTable({
     f <- fits()
     sev <- f$fit_severity
     mu <- if (is.null(sev$lnorm)) NA else round(sev$lnorm$meanlog, 3)
     sg <- if (is.null(sev$lnorm)) NA else round(sev$lnorm$sdlog, 3)
     data.frame(
-      Quantity = c("Frequency lambda", "Pareto alpha", "Lognormal mu",
+      Quantity = c("Pareto alpha", "Lognormal mu",
                    "Lognormal sigma", "Tail weight P(X>s | X>MT)"),
-      Value = c(round(f$fit_frequency$expected, 3), round(sev$pareto$alpha, 3),
+      Value = c(round(sev$pareto$alpha, 3),
                 mu, sg, round(sev$weight, 3)),
       check.names = FALSE
     )

@@ -38,13 +38,3 @@ test_that("fit_severity errors when the splice is above every loss", {
   losses <- c(6, 8, 10, 12)   # all below s = 100, so the Pareto tail is empty
   expect_error(fit_severity(losses, mt = 5, s = 100), "above the splice")
 })
-
-test_that("mean_excess computes e(u) = mean(X - u | X > u)", {
-  x <- c(6, 8, 10, 20)
-  me <- mean_excess(x, c(5, 12))
-  # u=5: excesses 1,3,5,15 -> mean 6. u=12: excess 8 -> mean 8.
-  expect_equal(me$mean_excess[me$threshold == 5], 6)
-  expect_equal(me$mean_excess[me$threshold == 12], 8)
-  # No losses above the threshold yields NA, not an error.
-  expect_true(is.na(mean_excess(x, 100)$mean_excess))
-})
