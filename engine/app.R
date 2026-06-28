@@ -61,6 +61,13 @@ build_results_table <- function(priced) {
   )
 }
 
+# A signature of the inputs that determine a price (data, modelling settings,
+# contract, seed). Two equal signatures mean the same price, so comparing the
+# signature from the last run with the live one tells us if results are stale.
+price_signature <- function(data, settings, contract, seed) {
+  list(data = data, settings = settings, contract = contract, seed = seed)
+}
+
 # Counts connected browser sessions so the app can shut itself down when the
 # last tab closes. An environment is mutable by reference and shared across
 # sessions; a short grace period (see server) tolerates a page refresh.
@@ -152,6 +159,13 @@ app_css <- shiny::tags$style(shiny::HTML("
      headers (Premium (EV) and Premium (SD)). Scoped to #results so the
      validation and data preview tables are untouched. */
   #results th:last-child, #results th:nth-last-child(2) { color: var(--navy-mid); }
+
+  /* Stale results: amber notice plus faded tables until the next Run. Amber, not
+     red, because red is reserved for destructive actions and errors. */
+  .stale-banner { background: #fff7e6; border: 1px solid #f0c36d;
+    border-left: 4px solid #d98324; border-radius: 6px; padding: 10px 14px;
+    margin-bottom: 16px; color: #7a4f12; font-weight: 600; }
+  .results-area.stale { opacity: 0.5; transition: opacity 0.15s ease; }
 
   /* Scrollable loss list: fixed height, header stays put while scrolling */
   .loss-scroll { max-height: 320px; overflow-y: auto;
@@ -374,8 +388,7 @@ ui <- shiny::fluidPage(
           shiny::tags$br(), shiny::tags$br(),
           shiny::downloadButton("download", "Download results")),
         shiny::column(8,
-          shiny::tags$h4("Results"), shiny::tableOutput("results"),
-          shiny::tags$h4("Validation"), shiny::tableOutput("validation"))
+          shiny::uiOutput("results_area"))
       ),
       step_nav("nav_4_back", "Back: Structure"))
   )
@@ -642,6 +655,44 @@ server <- function(input, output, session) {
       shiny::incProgress(0.3, detail = "Summarising results")
       out
     })
+  })
+
+  # ---- Stale-results detection ----
+  # Results persist from the last Run, so changing an input afterwards leaves the
+  # tables showing a price that no longer matches the controls. We snapshot the
+  # price-determining inputs at each Run and compare them with the live values to
+  # flag (and fade) stale results until the user reruns.
+  last_sig <- shiny::reactiveVal(NULL)
+
+  # Record what was priced on each valid Run. rv$data sidesteps input_data()'s
+  # upload-required guard; the default contract is already valid.
+  shiny::observeEvent(input$run, {
+    if (is.null(rv$data)) return()
+    ct <- contract()
+    if (is.null(validate_contract(ct))) {
+      last_sig(price_signature(rv$data, settings(), ct, input$seed))
+    }
+  })
+
+  # Stale when a run has happened and the live inputs no longer match it. The &&
+  # short-circuits before the first run, so there is no banner on launch.
+  is_stale <- shiny::reactive({
+    sig <- last_sig()
+    !is.null(sig) &&
+      !identical(sig, price_signature(rv$data, settings(), contract(), input$seed))
+  })
+
+  # Banner plus a dimmable wrapper around the two result tables. The table
+  # outputs below stay unchanged; this just places them inside a fadeable div.
+  output$results_area <- shiny::renderUI({
+    stale <- isTRUE(is_stale())
+    shiny::tagList(
+      if (stale) shiny::tags$div(class = "stale-banner",
+        "These results are out of date: an input changed since the last run. Click Run pricing to update."),
+      shiny::tags$div(class = if (stale) "results-area stale" else "results-area",
+        shiny::tags$h4("Results"), shiny::tableOutput("results"),
+        shiny::tags$h4("Validation"), shiny::tableOutput("validation"))
+    )
   })
 
   output$results <- shiny::renderTable(build_results_table(priced()$results))
