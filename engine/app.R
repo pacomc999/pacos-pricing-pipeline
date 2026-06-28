@@ -201,8 +201,9 @@ app_css <- shiny::tags$style(shiny::HTML("
     margin-bottom: 16px; color: #7a4f12; font-weight: 600; }
   .results-area.stale { opacity: 0.5; transition: opacity 0.15s ease; }
 
-  /* Scrollable loss list: fixed height, header stays put while scrolling */
-  .loss-scroll { max-height: 320px; overflow-y: auto;
+  /* Scrollable data preview: fixed height so the Losses and Exposure tables
+     line up top and bottom; the header stays put while scrolling. */
+  .loss-scroll { height: 320px; overflow-y: auto;
                  border: 1px solid var(--border); border-radius: 6px; }
   .loss-scroll table { margin-bottom: 0; }
   .loss-scroll thead th { position: sticky; top: 0; background: var(--bg-card); }
@@ -304,24 +305,32 @@ ui <- shiny::fluidPage(
           " historical loss list. You load the data here, choose how to model it,",
           " define the layers to price, then run a simulation to get a premium."),
         shiny::tags$p(shiny::tags$strong("This step"),
-          " loads your Excel workbook. It expects four sheets:"),
+          " loads the pricing template, a ready-made Excel workbook provided",
+          " with the tool. You do not build it yourself; you just fill your own",
+          " figures into its four sheets:"),
         shiny::tags$ul(
+          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (required, the year losses are revalued to), plus an optional currency and amount units that label the figures."),
           shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
           shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year."),
-          shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year."),
-          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (required, the year losses are revalued to), plus an optional currency and amount units that label the figures.")
+          shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year.")
         ),
         shiny::tags$p("The losses are revalued to the valuation year using the",
           " inflation rates, and the claim frequency is scaled by how exposure",
           " changes. The preview below lets you sanity-check what came in.")
       ),
-      shiny::fileInput("file", "Upload pricing workbook (.xlsx)", accept = ".xlsx"),
-      shiny::helpText("Your upload stays loaded across page refreshes."),
-      shiny::uiOutput("data_info"),
+      # Upload control on the left, the workbook's general inputs to its right,
+      # so the two preview tables below start at the same height.
       shiny::fluidRow(
         shiny::column(6,
+          shiny::fileInput("file", "Upload the filled-in template (.xlsx)", accept = ".xlsx"),
+          shiny::helpText("Your upload stays loaded across page refreshes."),
+          shiny::uiOutput("data_info")),
+        shiny::column(6,
           shiny::tags$h4("General inputs"),
-          shiny::tableOutput("data_params"),
+          shiny::tableOutput("data_params"))
+      ),
+      shiny::fluidRow(
+        shiny::column(6,
           shiny::tags$h4("Losses"),
           shiny::tags$div(class = "loss-scroll", shiny::tableOutput("loss_preview"))),
         shiny::column(6,
