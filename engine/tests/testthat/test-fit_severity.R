@@ -12,6 +12,13 @@ test_that("fit_severity splits body and tail at s, conditional on mt", {
   expect_false(is.null(fit$lnorm))
 })
 
+test_that("fit_severity includes losses exactly at mt", {
+  # The loss equal to mt (5) must be modelled: modelled = 9 values, tail (>15) = 3.
+  loss_values <- c(2, 5, 7, 8, 9, 10, 12, 20, 30, 50)
+  fit <- fit_severity(loss_values, mt = 5, s = 15)
+  expect_equal(round(fit$weight, 3), round(3 / 9, 3))
+})
+
 test_that("severity_survival is 1 at mt, continuous at s, Pareto above s", {
   fit <- list(mt = 5, s = 15, weight = 0.3,
               lnorm = list(meanlog = log(8), sdlog = 0.4),

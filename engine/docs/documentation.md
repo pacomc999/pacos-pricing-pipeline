@@ -141,7 +141,8 @@ overrides the workbook value, which overrides the built-in default (see
 `resolve_settings` in `pipeline.R`). The modelling threshold has no fixed
 built-in default: when neither the dashboard nor the workbook sets it, it starts
 at the smallest loss in the history, so the model includes every loss until you
-raise it.
+raise it. The threshold is inclusive: losses exactly at the modelling threshold
+are modelled, and only smaller losses are ignored.
 
 **Sheet `losses`** (one row per individual loss):
 

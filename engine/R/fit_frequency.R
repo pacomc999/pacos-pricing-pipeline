@@ -1,6 +1,8 @@
-# Counts losses above the threshold for each year in the observation period.
+# Counts losses at or above the threshold for each year in the observation
+# period. The threshold is inclusive, so a default set to the smallest loss
+# counts every loss.
 annual_counts <- function(losses, years, threshold) {
-  above <- losses[losses$loss > threshold, ]
+  above <- losses[losses$loss >= threshold, ]
   vapply(years, function(y) sum(above$year == y), integer(1))
 }
 

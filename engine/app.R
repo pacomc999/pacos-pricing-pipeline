@@ -232,6 +232,14 @@ app_css <- shiny::tags$style(shiny::HTML("
                  font-size: 14px; margin-bottom: 2px; }
   .method-card .method-formula { color: var(--text-muted); font-size: 12px;
                  margin-bottom: 8px; }
+
+  /* Calibration card: groups one calibration (frequency or severity) with its
+     own controls and outputs, so the Model step reads as two separate pieces
+     stacked vertically rather than one mixed block. */
+  .calib-card { background: #f4f7fc; border: 1px solid var(--border);
+                border-radius: 8px; padding: 18px 20px 8px; margin-bottom: 18px; }
+  .calib-card .calib-title { font-weight: 600; color: var(--navy-mid);
+                font-size: 16px; margin: 0 0 14px; }
 "))
 
 # A collapsible 'More information' panel for the top of a step. It starts closed
@@ -252,6 +260,16 @@ method_card <- function(title, formula, input) {
     shiny::tags$div(class = "method-title", title),
     shiny::tags$div(class = "method-formula", formula),
     input
+  )
+}
+
+# A titled card for one calibration (frequency or severity): its name plus its
+# own controls and outputs. Stacking two of these vertically keeps the frequency
+# and severity calibrations visually separate on the Model step.
+calib_card <- function(title, ...) {
+  shiny::tags$div(class = "calib-card",
+    shiny::tags$div(class = "calib-title", title),
+    ...
   )
 }
 
@@ -332,22 +350,34 @@ ui <- shiny::fluidPage(
           " so you can see how well the fitted curve matches the data and choose",
           " where the tail begins.")
       ),
+      # Shared modelling threshold: it gates both calibrations (which losses are
+      # counted, and where the severity fit starts), so it sits above both cards.
       shiny::fluidRow(
         shiny::column(4,
-          shiny::selectInput("freq", "Frequency model",
-                             choices = c("Poisson" = "poisson",
-                                         "Negative Binomial" = "negbin",
-                                         "Binomial" = "binomial"),
-                             selected = "poisson"),
-          shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold."),
           shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
-          shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA)),
-        shiny::column(8,
-          shiny::tags$h4("Frequency"),
-          shiny::tableOutput("freq_summary"),
-          shiny::tags$h4("Severity"),
-          shiny::plotOutput("sev_plot"),
-          shiny::tableOutput("sev_params"))
+          shiny::helpText("The loss size where modelling starts; smaller losses are ignored."))
+      ),
+      # Frequency calibration: the model choice and its fitted summary.
+      calib_card("Frequency calibration",
+        shiny::fluidRow(
+          shiny::column(4,
+            shiny::selectInput("freq", "Frequency model",
+                               choices = c("Poisson" = "poisson",
+                                           "Negative Binomial" = "negbin",
+                                           "Binomial" = "binomial"),
+                               selected = "poisson")),
+          shiny::column(8,
+            shiny::tableOutput("freq_summary")))
+      ),
+      # Severity calibration: the splice threshold, the live fit plot, and params.
+      calib_card("Severity calibration",
+        shiny::fluidRow(
+          shiny::column(4,
+            shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
+            shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold.")),
+          shiny::column(8,
+            shiny::plotOutput("sev_plot"),
+            shiny::tableOutput("sev_params")))
       ),
       step_nav("nav_2_back", "Back: Data", "nav_2_next", "Next: Structure")),
 
@@ -686,20 +716,31 @@ server <- function(input, output, session) {
              error = function(e) shiny::validate(shiny::need(FALSE, conditionMessage(e))))
   })
 
-  output$sev_plot <- shiny::renderPlot({
+  # bg matches the .calib-card colour so the plot blends into the severity card
+  # instead of showing as a white rectangle inside the tint.
+  output$sev_plot <- shiny::renderPlot(bg = "#f4f7fc", {
     f <- fits()
     fit <- f$fit_severity
-    above <- f$losses$loss_indexed[f$losses$loss_indexed > fit$mt]
+    above <- f$losses$loss_indexed[f$losses$loss_indexed >= fit$mt]
     xs <- seq(fit$mt, max(above), length.out = 200)
     u <- money_units()
     xlab_txt <- if (nzchar(u)) paste0("Loss (", u, ")") else "Loss"
-    plot(xs, 1 - severity_survival(fit, xs), type = "l",
+    # Set up the axes only; the curves are drawn after the white panel below.
+    plot(xs, 1 - severity_survival(fit, xs), type = "n", ylim = c(0, 1),
          xlab = xlab_txt, ylab = "CDF (conditional on X > MT)",
          main = "Fitted vs empirical severity")
-    lines(sort(above), stats::ecdf(above)(sort(above)), type = "s", col = "grey50")
-    abline(v = fit$s, col = "blue", lty = 2)
-    legend("bottomright", c("Fitted", "Empirical"),
-           col = c("black", "grey50"), lty = 1, bty = "n")
+    # Fill the panel interior white so only the margins keep the card tint.
+    usr <- graphics::par("usr")
+    graphics::rect(usr[1], usr[3], usr[2], usr[4], col = "white", border = NA)
+    # Draw the curves on top, thick enough that the colours read clearly.
+    graphics::lines(xs, 1 - severity_survival(fit, xs), col = "black", lwd = 2.5)
+    graphics::lines(sort(above), stats::ecdf(above)(sort(above)), type = "s",
+                    col = "grey50", lwd = 2.5)
+    graphics::abline(v = fit$s, col = "blue", lty = 2, lwd = 2)
+    graphics::box()
+    legend("bottomright", c("Fitted", "Empirical", "Splice threshold"),
+           col = c("black", "grey50", "blue"), lty = c(1, 1, 2),
+           lwd = 2.5, bty = "n")
   })
 
   # Frequency summary: the model, the forward expected claim count (exposure

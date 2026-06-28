@@ -4,11 +4,11 @@ fit_pareto_alpha <- function(x, x0) {
   length(x) / sum(log(x / x0))
 }
 
-# Fits the spliced severity conditional on X > mt: lognormal body on (mt, s],
+# Fits the spliced severity conditional on X >= mt: lognormal body on [mt, s],
 # Pareto tail on (s, Inf). Continuity at s comes from the mixture weight.
 fit_severity <- function(loss_values, mt, s) {
-  modelled <- loss_values[loss_values > mt]   # only losses above MT are modelled
-  body <- modelled[modelled <= s]             # (mt, s]
+  modelled <- loss_values[loss_values >= mt]  # losses at or above MT are modelled
+  body <- modelled[modelled <= s]             # [mt, s]
   tail <- modelled[modelled > s]              # (s, Inf)
   # The Pareto tail needs data above s; without it alpha is undefined (NaN).
   if (length(tail) < 1) {
