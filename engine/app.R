@@ -399,7 +399,14 @@ ui <- shiny::fluidPage(
         ),
         shiny::tags$p("Results show the expected loss, risk measures and two",
           " premiums. Validation compares the simulated expected loss to a",
-          " closed-form figure as a sanity check; small differences are expected.")
+          " closed-form figure as a sanity check; small differences are expected."),
+        shiny::tags$p(shiny::tags$strong("Burning cost"),
+          " in the validation table is the average annual loss to each layer",
+          " measured straight from the history, on an as-if basis: every past",
+          " loss is first restated to today by indexing it for inflation and",
+          " correcting for the change in exposure (as if it had happened now).",
+          " It is a purely empirical benchmark, so if the modelled expected loss",
+          " sits far from it, the fit is worth a second look.")
       ),
       shiny::fluidRow(
         shiny::column(4,
@@ -715,6 +722,9 @@ server <- function(input, output, session) {
       shiny::incProgress(0.55, detail = "Running Monte Carlo simulation")
       out <- price_models(f, ct, st, input$seed)
       shiny::incProgress(0.3, detail = "Summarising results")
+      # Empirical benchmark for validation: the average annual loss to each layer
+      # on an as-if basis (losses indexed and exposure corrected), in layer order.
+      out$burning_cost <- burning_cost(f$losses, ct)
       out
     })
   })
@@ -760,11 +770,14 @@ server <- function(input, output, session) {
   output$results <- shiny::renderTable(build_results_table(priced()$results))
 
   output$validation <- shiny::renderTable({
-    r <- priced()$results
+    p <- priced()
+    r <- p$results
+    bc <- p$burning_cost
     data.frame(Deductible = r$deductible, Cover = r$cover,
                Simulated = round(r$expected_loss, 3),
                `Closed form` = round(r$oracle, 3),
-               Delta = round(r$oracle_delta, 4), check.names = FALSE)
+               Delta = round(r$oracle_delta, 4),
+               `Burning cost` = round(bc$bc_advanced, 3), check.names = FALSE)
   })
 
   output$download <- shiny::downloadHandler(
