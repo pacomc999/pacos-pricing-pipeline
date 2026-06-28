@@ -149,6 +149,11 @@ app_css <- shiny::tags$style(shiny::HTML("
   .table > tbody > tr > td { border-top: 1px dashed var(--border); }
   .table > tbody > tr:hover > td { background: var(--bg-main); }
 
+  /* Premiums are the headline numbers: emphasise the last two result column
+     headers (Premium (EV) and Premium (SD)). Scoped to #results so the
+     validation and data preview tables are untouched. */
+  #results th:last-child, #results th:nth-last-child(2) { color: var(--navy-mid); }
+
   /* Scrollable loss list: fixed height, header stays put while scrolling */
   .loss-scroll { max-height: 320px; overflow-y: auto;
                  border: 1px solid var(--border); border-radius: 6px; }
