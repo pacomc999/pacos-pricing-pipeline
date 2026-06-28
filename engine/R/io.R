@@ -40,7 +40,6 @@ read_input <- function(path) {
     if (k %in% names(pv) && !is.na(pv[[k]])) pv[[k]] else NA_character_
   }
   parameters <- list(
-    reporting_threshold = num("reporting_threshold"),
     valuation_year      = as.integer(num("valuation_year")),
     modelling_threshold = opt_num("modelling_threshold"),
     splice_threshold    = opt_num("splice_threshold"),

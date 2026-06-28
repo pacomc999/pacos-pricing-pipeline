@@ -1,10 +1,12 @@
 # Resolves the modelling and pricing settings used for fitting and pricing.
 # Precedence: explicit overrides (from the dashboard) > values in the workbook
 # parameters sheet > built-in defaults. A NA splice threshold means "use the
-# modelling threshold", which collapses the body and gives a single Pareto.
-resolve_settings <- function(parameters, overrides = list()) {
+# modelling threshold", which collapses the body and gives a single Pareto. The
+# modelling threshold defaults to the smallest historical loss (so the model
+# includes every loss) unless the workbook or the dashboard sets one.
+resolve_settings <- function(parameters, overrides = list(), losses = NULL) {
   defaults <- list(
-    modelling_threshold = parameters$reporting_threshold,
+    modelling_threshold = if (length(losses)) min(losses) else NA_real_,
     splice_threshold    = NA_real_,
     frequency_model     = "poisson",
     n_simulations       = 100000L,
@@ -82,7 +84,7 @@ run_pricing <- function(input_path, overrides = list(),
                         contract = default_contract(), output_path = NULL,
                         seed = NULL) {
   input <- read_input(input_path)
-  settings <- resolve_settings(input$parameters, overrides)
+  settings <- resolve_settings(input$parameters, overrides, input$losses$loss)
   fits <- fit_models(input, settings)
   priced <- price_models(fits, contract, settings, seed)
   results <- priced$results

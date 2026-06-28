@@ -283,7 +283,7 @@ ui <- shiny::fluidPage(
           shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
           shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year."),
           shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year."),
-          shiny::tags$li(shiny::tags$strong("parameters"), ": the reporting threshold and the valuation year.")
+          shiny::tags$li(shiny::tags$strong("parameters"), ": the valuation year (the year losses are revalued to).")
         ),
         shiny::tags$p("The losses are revalued to the valuation year using the",
           " inflation rates, and the claim frequency is scaled by how exposure",
@@ -623,8 +623,8 @@ server <- function(input, output, session) {
   output$data_params <- shiny::renderTable({
     p <- input_data()$parameters
     data.frame(
-      Parameter = c("Reporting threshold", "Valuation year"),
-      Value = c(p$reporting_threshold, p$valuation_year),
+      Parameter = "Valuation year",
+      Value = p$valuation_year,
       check.names = FALSE
     )
   })
@@ -632,7 +632,7 @@ server <- function(input, output, session) {
   # When a workbook is loaded, seed the controls from its defaults (or built-in
   # defaults) so the user starts from a sensible point.
   shiny::observeEvent(input_data(), {
-    st <- resolve_settings(input_data()$parameters)
+    st <- resolve_settings(input_data()$parameters, losses = input_data()$losses$loss)
     shiny::updateNumericInput(session, "mt", value = st$modelling_threshold)
     shiny::updateNumericInput(session, "s", value = st$splice_threshold)
     shiny::updateSelectInput(session, "freq", selected = st$frequency_model)

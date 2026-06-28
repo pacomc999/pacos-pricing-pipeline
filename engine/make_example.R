@@ -24,8 +24,7 @@ exposure <- data.frame(year = 2021:2026, exposure = c(120, 120, 130, 140, 145, 1
 inflation <- data.frame(year = 2021:2026, inflation = c(0.02, 0.03, 0.025, 0.04, 0.03, 0.035))
 # Only the data parameters live in the workbook now. The modelling choices
 # (thresholds, frequency model, simulations, loadings) are set in the dashboard.
-parameters <- data.frame(key = c("reporting_threshold", "valuation_year"),
-                         value = c("5", "2026"))
+parameters <- data.frame(key = "valuation_year", value = "2026")
 
 # ---- Styles (navy header to match the dashboard banner) ---------------------
 header  <- openxlsx::createStyle(fontColour = "#FFFFFF", fgFill = "#1B2A4A",

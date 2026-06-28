@@ -149,19 +149,21 @@ constant):
 | `year` | integer | |
 | `inflation` | numeric | loss inflation during that year, for example 0.03 for 3% |
 
-**Sheet `parameters`** (key and value rows; only the data parameters live here,
+**Sheet `parameters`** (key and value rows; only the valuation year is required,
 the modelling choices are set in the dashboard):
 
 | key | example | notes |
 |-----|---------|-------|
-| `reporting_threshold` | 5 | losses below this are not present in the data |
 | `valuation_year` | 2026 | the year all losses are revalued to |
 
 The workbook may optionally also carry modelling defaults (modelling threshold,
 splice threshold, frequency model, simulations, loadings, VaR level). When
 present they seed the dashboard controls. The precedence is: dashboard control
 overrides the workbook value, which overrides the built-in default (see
-`resolve_settings` in `pipeline.R`).
+`resolve_settings` in `pipeline.R`). The modelling threshold has no fixed
+built-in default: when neither the dashboard nor the workbook sets it, it starts
+at the smallest loss in the history, so the model includes every loss until you
+raise it.
 
 ## Output
 

@@ -19,10 +19,10 @@ write_tmp_workbook <- function() {
   ))
   openxlsx::addWorksheet(wb, "parameters")
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "modelling_threshold",
+    key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
-    value = c("3", "5", "15", "poisson", "100000", "2026",
+    value = c("5", "15", "poisson", "100000", "2026",
               "0.1", "0.2", "0.99")
   ))
   openxlsx::saveWorkbook(wb, path)
@@ -50,19 +50,19 @@ test_that("read_input parses all four sheets with correct types", {
   expect_null(input$contract)
 })
 
-test_that("read_input accepts a workbook with only the data parameters", {
+test_that("read_input accepts a workbook with only the required data parameter", {
   path <- write_tmp_workbook()
   wb <- openxlsx::loadWorkbook(path)
   openxlsx::removeWorksheet(wb, "parameters")
   openxlsx::addWorksheet(wb, "parameters")
-  # Only the required data parameters; modelling choices are set in the UI.
+  # Only the required data parameter; modelling choices are set in the UI.
   openxlsx::writeData(wb, "parameters", data.frame(
-    key = c("reporting_threshold", "valuation_year"),
-    value = c("3", "2026")))
+    key = "valuation_year", value = "2026"))
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
 
   input <- read_input(path)
-  expect_equal(input$parameters$reporting_threshold, 3)
+  expect_equal(input$parameters$valuation_year, 2026)
+  expect_null(input$parameters$reporting_threshold)          # no longer read
   expect_true(is.na(input$parameters$modelling_threshold))   # optional, absent
   expect_true(is.na(input$parameters$frequency_model))
 })
@@ -73,7 +73,7 @@ test_that("read_input errors clearly on a missing required parameter", {
   openxlsx::removeWorksheet(wb, "parameters")
   openxlsx::addWorksheet(wb, "parameters")
   openxlsx::writeData(wb, "parameters",
-    data.frame(key = "reporting_threshold", value = "3"))
+    data.frame(key = "modelling_threshold", value = "5"))
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   expect_error(read_input(path), "Missing required parameter")
 })
