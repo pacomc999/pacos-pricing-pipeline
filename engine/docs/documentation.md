@@ -107,7 +107,7 @@ lives in `engine/`.
 | `engine/tests/testthat/` | One test file per module. |
 | `engine/make_example.R` | Regenerates the styled `input.xlsx` template. |
 | `engine/install_deps.R` | Installs and verifies the required packages. |
-| `engine/docs/` | This documentation and the design spec and plan. |
+| `engine/docs/` | This documentation (Markdown; a Word copy is at the repo root). |
 
 ## Ways to run it
 
@@ -418,6 +418,14 @@ is exactly where a parametric model earns its keep.
   selected from the data, because reinsurance data is typically too sparse to
   support that choice.
 
+## Future work
+
+Several extensions were planned but deferred from v1, and the engine was
+structured to accommodate them without rework: proportional treaties (quota
+share and surplus), loss development and IBNR for long-tail lines, exposure
+rating curves for low-data lines, and portfolio aggregation across several lines
+of business (v1 prices a single book at a time).
+
 ---
 
 # References
@@ -425,5 +433,6 @@ is exactly where a parametric model earns its keep.
 - P. Arbenz, *Reinsurance Analytics*, FS 2026, Section 2.8 (experience pricing).
   This third-party material is kept locally and is not distributed with the
   tool.
-- The full design specification and implementation plan are in
-  `engine/docs/superpowers/`.
+- The design and methodology are documented here; the implementation is in the
+  R modules under `engine/R/`, each with a matching test in
+  `engine/tests/testthat/`.

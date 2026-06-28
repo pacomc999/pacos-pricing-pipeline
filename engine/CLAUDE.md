@@ -23,9 +23,9 @@ inside this `engine/` folder:
 ## Layout
 - This project lives in `engine/`; the parent folder holds only `start.vbs`,
   `input.xlsx`, and `README.md` so end users see a clean folder.
-- R/ holds one module per responsibility (see the design spec).
+- R/ holds one module per responsibility (see docs/documentation.md).
 - tests/testthat/ holds one test file per module; helper-setup.R sources R/.
-- docs/superpowers/ holds the design spec and the implementation plan.
+- docs/documentation.md is the technical documentation (a Word copy lives at the repo root).
 - make_example.R writes the template one level up (../input.xlsx).
 
 ## Conventions

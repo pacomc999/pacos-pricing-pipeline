@@ -113,8 +113,8 @@ threshold MT that drives frequency, and a higher splice point s where the
 lognormal body hands over to the Pareto tail), Poisson frequency by default,
 Monte Carlo aggregate loss, and a simulation-independent expected loss as a
 validation check. Follows the experience-pricing recipe in the FS 2026
-Reinsurance Analytics notes (Section 2.8). See engine/docs/superpowers/specs for
-the full design.
+Reinsurance Analytics notes (Section 2.8). See `engine/docs/documentation.md`
+for the full methodology.
 
 ## Tests
 From inside the `engine` folder: `Rscript run_tests.R`
