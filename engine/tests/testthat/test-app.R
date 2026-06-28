@@ -51,3 +51,12 @@ test_that("build_structure_plot_data returns empty when no layer has cover", {
                    aad = numeric(0), aal = numeric(0))
   expect_equal(nrow(build_structure_plot_data(ct)), 0)
 })
+
+test_that("unit_label joins currency and units, dropping whatever is missing", {
+  expect_equal(unit_label("EUR", "millions"), "EUR millions")
+  expect_equal(unit_label("EUR", NA), "EUR")
+  expect_equal(unit_label(NA, "millions"), "millions")
+  expect_equal(unit_label(NA, NA), "")
+  expect_equal(unit_label(NULL, NULL), "")
+  expect_equal(unit_label("", "millions"), "millions")
+})

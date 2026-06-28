@@ -70,7 +70,7 @@ result$results
 ## Input workbook
 The workbook holds the data only; the modelling choices and the contract
 structure are set in the dashboard. It has four sheets: `losses`, `exposure`,
-`inflation`, and `parameters`. Run `Rscript engine/make_example.R` for a
+`inflation`, and `general inputs`. Run `Rscript engine/make_example.R` for a
 ready-made example, and see `engine/docs/documentation.md` for the full
 column-by-column schema.
 

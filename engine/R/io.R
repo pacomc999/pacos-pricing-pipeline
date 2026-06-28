@@ -4,7 +4,7 @@
 # per-year rate (its own sheet), not a single constant.
 read_input <- function(path) {
   if (!file.exists(path)) stop("Input workbook not found: ", path)
-  required_sheets <- c("losses", "exposure", "parameters", "inflation")
+  required_sheets <- c("losses", "exposure", "general inputs", "inflation")
   present <- readxl::excel_sheets(path)
   missing <- setdiff(required_sheets, present)
   if (length(missing) > 0) {
@@ -16,8 +16,9 @@ read_input <- function(path) {
   exposure <- as.data.frame(readxl::read_excel(path, sheet = "exposure"))
   inflation <- as.data.frame(readxl::read_excel(path, sheet = "inflation"))
 
-  # Parameters arrive as key/value rows; turn them into a typed named list.
-  raw_params <- as.data.frame(readxl::read_excel(path, sheet = "parameters"))
+  # General inputs arrive as key/value rows (any extra columns, e.g. a notes
+  # column, are ignored); turn them into a typed named list.
+  raw_params <- as.data.frame(readxl::read_excel(path, sheet = "general inputs"))
   pv <- setNames(as.character(raw_params$value), raw_params$key)
   # pv is a named character vector, so check the name exists before subsetting
   # (pv[["missing"]] would throw "subscript out of bounds", not return NULL).
@@ -41,6 +42,8 @@ read_input <- function(path) {
   }
   parameters <- list(
     valuation_year      = as.integer(num("valuation_year")),
+    currency            = opt_chr("currency"),
+    amount_units        = opt_chr("amount_units"),
     modelling_threshold = opt_num("modelling_threshold"),
     splice_threshold    = opt_num("splice_threshold"),
     frequency_model     = opt_chr("frequency_model"),

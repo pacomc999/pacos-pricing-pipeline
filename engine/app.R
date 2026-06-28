@@ -72,6 +72,14 @@ build_structure_plot_data <- function(contract) {
   )
 }
 
+# Builds a short money-unit label like "EUR millions" from the optional currency
+# and amount_units general inputs, dropping whichever is missing ("" if neither).
+unit_label <- function(currency, units) {
+  parts <- c(currency, units)
+  parts <- parts[!is.na(parts) & nzchar(as.character(parts))]
+  paste(parts, collapse = " ")
+}
+
 # Formats the priced results for on-screen display (pure, unit-tested).
 build_results_table <- function(priced) {
   data.frame(
@@ -283,7 +291,7 @@ ui <- shiny::fluidPage(
           shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
           shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year."),
           shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year."),
-          shiny::tags$li(shiny::tags$strong("parameters"), ": the valuation year (the year losses are revalued to).")
+          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (required, the year losses are revalued to), plus an optional currency and amount units that label the figures.")
         ),
         shiny::tags$p("The losses are revalued to the valuation year using the",
           " inflation rates, and the claim frequency is scaled by how exposure",
@@ -556,8 +564,10 @@ server <- function(input, output, session) {
     }
     n <- nrow(d)
     ymax <- max(d$top) * 1.14
+    u <- money_units()
+    ylab_txt <- if (nzchar(u)) paste0("Loss amount (", u, ")") else "Loss amount"
     plot(NA, xlim = c(0.5, n + 0.5), ylim = c(0, ymax), xaxt = "n",
-         xlab = "", ylab = "Loss amount")
+         xlab = "", ylab = ylab_txt)
     graphics::axis(1, at = seq_len(n), labels = paste("Layer", d$layer))
     # Dotted guide lines at every layer boundary (each deductible and top). When
     # two layers meet exactly, their lines coincide; a gap or overlap shows as
@@ -591,6 +601,14 @@ server <- function(input, output, session) {
     rv$data
   })
 
+  # Money-unit label ("EUR millions" or "") from the optional general inputs.
+  # Read straight from rv$data so it works before any upload (no upload guard),
+  # which the always-on structure plot needs.
+  money_units <- shiny::reactive({
+    p <- rv$data$parameters
+    unit_label(p$currency, p$amount_units)
+  })
+
   # ---- Step 1 data preview ----
   # A short confirmation of what loaded: filename, loss count, and year range.
   output$data_info <- shiny::renderUI({
@@ -622,9 +640,14 @@ server <- function(input, output, session) {
   # choices are set on the Model step, not in the file).
   output$data_params <- shiny::renderTable({
     p <- input_data()$parameters
+    shown <- function(x) {
+      if (is.null(x) || all(is.na(x)) || !nzchar(as.character(x))) "(not set)"
+      else as.character(x)
+    }
     data.frame(
-      Parameter = "Valuation year",
-      Value = p$valuation_year,
+      Parameter = c("Valuation year", "Currency", "Amount units"),
+      Value = c(as.character(p$valuation_year), shown(p$currency),
+                shown(p$amount_units)),
       check.names = FALSE
     )
   })
@@ -667,8 +690,10 @@ server <- function(input, output, session) {
     fit <- f$fit_severity
     above <- f$losses$loss_indexed[f$losses$loss_indexed > fit$mt]
     xs <- seq(fit$mt, max(above), length.out = 200)
+    u <- money_units()
+    xlab_txt <- if (nzchar(u)) paste0("Loss (", u, ")") else "Loss"
     plot(xs, 1 - severity_survival(fit, xs), type = "l",
-         xlab = "Loss", ylab = "CDF (conditional on X > MT)",
+         xlab = xlab_txt, ylab = "CDF (conditional on X > MT)",
          main = "Fitted vs empirical severity")
     lines(sort(above), stats::ecdf(above)(sort(above)), type = "s", col = "grey50")
     abline(v = fit$s, col = "blue", lty = 2)
@@ -762,7 +787,10 @@ server <- function(input, output, session) {
       if (stale) shiny::tags$div(class = "stale-banner",
         "These results are out of date: an input changed since the last run. Click Run pricing to update."),
       shiny::tags$div(class = if (stale) "results-area stale" else "results-area",
-        shiny::tags$h4("Results"), shiny::tableOutput("results"),
+        shiny::tags$h4("Results"),
+        if (nzchar(money_units()))
+          shiny::helpText(paste0("Amounts are in ", money_units(), ".")),
+        shiny::tableOutput("results"),
         shiny::tags$h4("Validation"), shiny::tableOutput("validation"))
     )
   })
@@ -785,10 +813,13 @@ server <- function(input, output, session) {
     content = function(file) {
       st <- settings()
       r <- priced()$results
+      gp <- input_data()$parameters
       assumptions <- data.frame(
-        key = c("modelling_threshold", "splice_threshold", "frequency_model",
+        key = c("valuation_year", "currency", "amount_units",
+                "modelling_threshold", "splice_threshold", "frequency_model",
                 "n_simulations", "loading_ev", "loading_sd", "var_level"),
-        value = c(st$modelling_threshold, st$splice_threshold, st$frequency_model,
+        value = c(gp$valuation_year, gp$currency, gp$amount_units,
+                  st$modelling_threshold, st$splice_threshold, st$frequency_model,
                   st$n_simulations, st$loading_ev, st$loading_sd, st$var_level))
       write_output(file, r, assumptions)
     }

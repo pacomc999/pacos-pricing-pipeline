@@ -12,10 +12,10 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   openxlsx::addWorksheet(wb, "inflation")
   openxlsx::writeData(wb, "inflation", data.frame(
     year = 2021:2025, inflation = rep(0, 5)))   # zero inflation to match Table 13
-  openxlsx::addWorksheet(wb, "parameters")
+  openxlsx::addWorksheet(wb, "general inputs")
   # splice_threshold = modelling_threshold collapses the body, giving the pure
   # Pareto model the notes use, so the result must match Table 13.
-  openxlsx::writeData(wb, "parameters", data.frame(
+  openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
@@ -53,8 +53,8 @@ test_that("frequency window excludes the prospective valuation year", {
   openxlsx::addWorksheet(wb, "inflation")
   openxlsx::writeData(wb, "inflation", data.frame(
     year = 2021:2024, inflation = rep(0, 4)))
-  openxlsx::addWorksheet(wb, "parameters")
-  openxlsx::writeData(wb, "parameters", data.frame(
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level"),
@@ -81,8 +81,8 @@ test_that("a growing book scales the projected frequency by exposure", {
   openxlsx::addWorksheet(wb, "inflation")
   openxlsx::writeData(wb, "inflation", data.frame(
     year = 2021:2024, inflation = rep(0, 4)))
-  openxlsx::addWorksheet(wb, "parameters")
-  openxlsx::writeData(wb, "parameters", data.frame(
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold", "splice_threshold",
             "frequency_model", "n_simulations", "valuation_year",
             "loading_ev", "loading_sd", "var_level"),
@@ -108,8 +108,8 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   openxlsx::addWorksheet(wb, "inflation")
   openxlsx::writeData(wb, "inflation", data.frame(
     year = 2021:2025, inflation = rep(0, 5)))
-  openxlsx::addWorksheet(wb, "parameters")
-  openxlsx::writeData(wb, "parameters", data.frame(
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
     key = "valuation_year", value = "2025"))
   openxlsx::saveWorkbook(wb, path)
 

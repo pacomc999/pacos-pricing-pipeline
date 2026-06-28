@@ -149,12 +149,14 @@ constant):
 | `year` | integer | |
 | `inflation` | numeric | loss inflation during that year, for example 0.03 for 3% |
 
-**Sheet `parameters`** (key and value rows; only the valuation year is required,
-the modelling choices are set in the dashboard):
+**Sheet `general inputs`** (key and value rows; an optional `notes` column may
+describe each field and is ignored by the reader):
 
-| key | example | notes |
-|-----|---------|-------|
-| `valuation_year` | 2026 | the year all losses are revalued to |
+| key | example | required | notes |
+|-----|---------|----------|-------|
+| `valuation_year` | 2026 | yes | the year all losses are revalued to |
+| `currency` | EUR | no | labels every amount in the dashboard and the export |
+| `amount_units` | millions | no | labels the scale of the figures, e.g. millions |
 
 The workbook may optionally also carry modelling defaults (modelling threshold,
 splice threshold, frequency model, simulations, loadings, VaR level). When
