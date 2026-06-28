@@ -7,3 +7,6 @@
 
 # Reference literature is kept locally, never committed (third-party material).
 Literature/
+
+# Office lock/owner files (created while a doc is open in Word/Excel).
+~$*

@@ -25,7 +25,7 @@ inside this `engine/` folder:
   `input.xlsx`, and `README.md` so end users see a clean folder.
 - R/ holds one module per responsibility (see docs/documentation.md).
 - tests/testthat/ holds one test file per module; helper-setup.R sources R/.
-- docs/documentation.md is the technical documentation (a Word copy lives at the repo root).
+- docs/documentation.md is the technical documentation; the Word copy at the repo root is generated from it by docs/build_docx.R (run that after editing, never hand-edit the .docx).
 - make_example.R writes the template one level up (../input.xlsx).
 
 ## Conventions

@@ -68,44 +68,23 @@ result$results
 ```
 
 ## Input workbook
-The workbook holds the data; the modelling choices and the contract structure
-are made in the dashboard. Four sheets:
-- `losses`: `year`, `loss`, `line_of_business`
-- `exposure`: `year`, `exposure`
-- `inflation`: `year`, `inflation` (the per-year loss inflation rate, e.g. 0.03
-  for 3%; a loss is revalued by compounding the rates of the years after it up
-  to the valuation year)
-- `parameters`: `key`, `value` (only the data parameters: `reporting_threshold`,
-  `valuation_year`)
-
-The modelling threshold, splice threshold, frequency model, simulation count,
-loadings, and VaR level are set as controls in the dashboard (not in the file),
-so you can tune them while watching the fit. The reinsurance layers (the
-contract structure) are built on the dashboard's **Structure** tab, where you
-add or remove layers and edit each one's deductible, cover, AAD, and AAL.
-
-See `engine/make_example.R` for a complete example.
+The workbook holds the data only; the modelling choices and the contract
+structure are set in the dashboard. It has four sheets: `losses`, `exposure`,
+`inflation`, and `parameters`. Run `Rscript engine/make_example.R` for a
+ready-made example, and see `engine/docs/documentation.md` for the full
+column-by-column schema.
 
 ## Using the dashboard
-The dashboard is a guided four-step flow: **Data**, **Model**, **Structure**,
-**Price**. The steps are clickable, so you can jump back to iterate, and each has
-a collapsible "More information" panel.
-1. **Data.** Upload your workbook (`input.xlsx`, or any file with the same
-   sheets) and review the losses, exposure and inflation that loaded. The upload
-   stays loaded if you refresh the page; it is cleared only when you close the
-   tool.
-2. **Model.** Set the modelling threshold, the splice threshold and the
-   frequency model while live tables and plots show the fit: a frequency summary
-   (expected claims per year) and the fitted vs empirical severity.
-3. **Structure.** Build the program: add or remove layers and edit each layer's
-   deductible, cover, AAD, and AAL. A tower diagram updates live so you can check
-   the layers visually. It starts with a three-layer demo so you can price
-   straight away.
-4. **Price.** Set the loadings, simulation count and seed, then click **Run
-   pricing**. The Results table shows the per-layer expected loss, risk measures
-   and two premiums; the Validation table cross-checks the simulated expected
-   loss against a closed-form figure and an as-if burning cost benchmark.
-   **Download results** writes `output.xlsx`.
+A guided, clickable four-step flow, each step with a "More information" panel:
+1. **Data** — upload the workbook and review what loaded.
+2. **Model** — set the modelling and splice thresholds and the frequency model,
+   watching the live fit.
+3. **Structure** — build the layer program (a tower diagram updates live).
+4. **Price** — set the loadings and simulations, click **Run pricing**, read the
+   results and validation, then **Download results**.
+
+It opens with a three-layer demo so you can price straight away. See
+`engine/docs/documentation.md` for the full walkthrough.
 
 ## Method
 Spliced lognormal plus Pareto severity with two thresholds (a modelling
