@@ -58,7 +58,6 @@ build_results_table <- function(priced) {
     RoL = round(priced$rol, 4),
     `Premium (EV)` = round(priced$premium_ev, 2),
     `Premium (SD)` = round(priced$premium_sd, 2),
-    `Closed form` = round(priced$oracle, 2),
     check.names = FALSE
   )
 }
