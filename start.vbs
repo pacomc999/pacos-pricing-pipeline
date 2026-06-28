@@ -3,13 +3,32 @@
 ' If something goes wrong, it shows a popup explaining what to do.
 ' (If your computer blocks .vbs files, double-click start.bat instead.)
 Option Explicit
-Dim sh, fso, here, bat, logFile, q, cmdline, ret, msg
+Dim sh, fso, here, bat, logFile, q, cmdline, ret, msg, tempDir, stamp, n, oldFile
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 here = fso.GetParentFolderName(WScript.ScriptFullName)
 bat = here & "\engine\start.bat"
 q = Chr(34)
-logFile = sh.ExpandEnvironmentStrings("%TEMP%") & "\pppp_launch_log.txt"
+tempDir = sh.ExpandEnvironmentStrings("%TEMP%")
+
+' Sweep any leftover logs from previous runs (e.g. after an abnormal shutdown)
+' so they never accumulate. A log still held open by a running instance stays
+' locked and is simply skipped.
+On Error Resume Next
+For Each oldFile In fso.GetFolder(tempDir).Files
+  If LCase(Left(oldFile.Name, 12)) = "pppp_launch_" Then fso.DeleteFile oldFile.Path, True
+Next
+On Error GoTo 0
+
+' Unique log file per launch. A single shared log was held open for the whole
+' time the tool ran, so relaunching within the self-shutdown grace collided on
+' that one file and the new launch silently failed. A per-launch name avoids it.
+Randomize
+n = Now
+stamp = Year(n) & Right("0" & Month(n), 2) & Right("0" & Day(n), 2) & "_" & _
+        Right("0" & Hour(n), 2) & Right("0" & Minute(n), 2) & Right("0" & Second(n), 2) & _
+        "_" & Int(Rnd * 100000)
+logFile = tempDir & "\pppp_launch_" & stamp & ".txt"
 
 ' Call start.bat by full path (the current directory is excluded from command
 ' search on some secure machines), capture its output to a log, run it with a
@@ -34,3 +53,8 @@ If ret <> 0 And InStr(logText, "Listening on") = 0 Then
   msg = "Paco's Pricing Pipeline could not start." & vbCrLf & vbCrLf & logText
   MsgBox msg, vbExclamation, "Pricing Pipeline"
 End If
+
+' Remove this launch's log now that it has been read, so logs do not pile up.
+On Error Resume Next
+If fso.FileExists(logFile) Then fso.DeleteFile logFile
+On Error GoTo 0
