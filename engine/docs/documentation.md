@@ -169,7 +169,7 @@ When you download results from the dashboard, or pass an `output_path` to
 `run_pricing`, the tool writes a two-sheet workbook:
 
 - **`results`**: one row per layer with the expected loss, standard deviation,
-  VaR, TVaR, rate on line, both premiums, the closed-form expected loss, and the
+  VaR, TVaR, both premiums, the closed-form expected loss, and the
   validation delta.
 - **`assumptions`**: an echo of the fitted parameters and the settings used, so
   a result is self-documenting.
@@ -367,8 +367,6 @@ empirical loss distribution for each layer. From it (`price_layer`):
   user-chosen level $q$ (default 0.99).
 - **Tail Value at Risk** $\mathrm{TVaR}_q$, the mean of the losses at or above
   the VaR.
-- **Rate on line** $\mathrm{RoL} = P / C$, the premium relative to the layer
-  width.
 
 Two premium principles are reported, both driven by user-set loadings:
 

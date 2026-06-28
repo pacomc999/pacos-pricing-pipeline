@@ -55,7 +55,6 @@ build_results_table <- function(priced) {
     `Std dev` = round(priced$sd_loss, 2),
     VaR = round(priced$var, 2),
     TVaR = round(priced$tvar, 2),
-    RoL = round(priced$rol, 4),
     `Premium (EV)` = round(priced$premium_ev, 2),
     `Premium (SD)` = round(priced$premium_sd, 2),
     check.names = FALSE

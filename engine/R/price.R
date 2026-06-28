@@ -31,7 +31,6 @@ price_layer <- function(sims, layer_row, premium_params) {
     deductible = D, cover = C,
     expected_loss = expected_loss, sd_loss = sd_loss,
     var = var_q, tvar = tvar,
-    rol = premium_ev / C,
     premium_ev = premium_ev, premium_sd = premium_sd
   )
 }
