@@ -32,3 +32,22 @@ test_that("validate_contract rejects empty and invalid programs", {
   good <- data.frame(deductible = 5, cover = 5, aad = 0, aal = 0)
   expect_null(validate_contract(good))
 })
+
+test_that("build_structure_plot_data computes tops and labels, dropping bad rows", {
+  ct <- data.frame(deductible = c(0, 5, 10),
+                   cover = c(5, 5, 0),          # third row: cover 0 -> dropped
+                   aad = c(NA, 5, NA),
+                   aal = c(NA, 20, NA))
+  d <- build_structure_plot_data(ct)
+  expect_equal(nrow(d), 2)
+  expect_equal(d$top, c(5, 10))                 # deductible + cover
+  expect_equal(d$terms, c("5 xs 0", "5 xs 5"))
+  expect_equal(d$aggregate[1], "AAD none / AAL unlimited")  # blank aggregates
+  expect_equal(d$aggregate[2], "AAD 5 / AAL 20")
+})
+
+test_that("build_structure_plot_data returns empty when no layer has cover", {
+  ct <- data.frame(deductible = numeric(0), cover = numeric(0),
+                   aad = numeric(0), aal = numeric(0))
+  expect_equal(nrow(build_structure_plot_data(ct)), 0)
+})

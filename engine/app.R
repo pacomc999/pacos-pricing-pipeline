@@ -46,6 +46,32 @@ validate_contract <- function(contract) {
   NULL
 }
 
+# Turns the live contract into per-layer rows for the structure tower plot: each
+# block spans deductible to deductible+cover, with a terms label and a formatted
+# aggregate (AAD/AAL) label. Rows without a positive cover (blank or mid-edit)
+# are dropped. Pure and unit-tested; the render only draws from this.
+build_structure_plot_data <- function(contract) {
+  fmt <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+  keep <- is.finite(contract$cover) & contract$cover > 0 &
+          is.finite(contract$deductible) & contract$deductible >= 0
+  ct <- contract[keep, , drop = FALSE]
+  if (nrow(ct) == 0) {
+    return(data.frame(layer = integer(0), deductible = numeric(0),
+                      top = numeric(0), terms = character(0),
+                      aggregate = character(0), stringsAsFactors = FALSE))
+  }
+  aad_txt <- ifelse(is.na(ct$aad), "none", fmt(ct$aad))
+  aal_txt <- ifelse(is.na(ct$aal), "unlimited", fmt(ct$aal))
+  data.frame(
+    layer = seq_len(nrow(ct)),
+    deductible = ct$deductible,
+    top = ct$deductible + ct$cover,
+    terms = paste0(fmt(ct$cover), " xs ", fmt(ct$deductible)),
+    aggregate = paste0("AAD ", aad_txt, " / AAL ", aal_txt),
+    stringsAsFactors = FALSE
+  )
+}
+
 # Formats the priced results for on-screen display (pure, unit-tested).
 build_results_table <- function(priced) {
   data.frame(
@@ -347,6 +373,8 @@ ui <- shiny::fluidPage(
       ),
       shiny::uiOutput("structure_ui"),
       shiny::actionButton("add_layer", "Add layer"),
+      shiny::tags$h4("Layer structure", style = "margin-top: 26px;"),
+      shiny::plotOutput("structure_plot", height = "360px"),
       step_nav("nav_3_back", "Back: Model", "nav_3_next", "Next: Price")),
 
     # Step 4: set the loadings, run the Monte Carlo, read the price.
@@ -509,6 +537,35 @@ server <- function(input, output, session) {
                  aad = val("aad"), aal = val("aal"))
     })
     build_contract_df(do.call(rbind, rows))
+  })
+
+  # Live tower plot of the layer structure, so the user can visually check the
+  # program. Reads the same contract() as pricing, so it always matches.
+  output$structure_plot <- shiny::renderPlot({
+    d <- build_structure_plot_data(contract())
+    if (nrow(d) == 0) {
+      plot.new()
+      graphics::text(0.5, 0.5, "Add a layer to see the structure.",
+                     col = "#69707c", cex = 1.1)
+      return(invisible())
+    }
+    n <- nrow(d)
+    ymax <- max(d$top) * 1.14
+    plot(NA, xlim = c(0.5, n + 0.5), ylim = c(0, ymax), xaxt = "n",
+         xlab = "", ylab = "Loss amount")
+    graphics::axis(1, at = seq_len(n), labels = paste("Layer", d$layer))
+    # Dotted guide lines at every layer boundary (each deductible and top). When
+    # two layers meet exactly, their lines coincide; a gap or overlap shows as
+    # two separate lines, so alignment is easy to check by eye.
+    graphics::abline(h = sort(unique(c(d$deductible, d$top))),
+                     lty = 3, col = "#9aa6b8")
+    w <- 0.35
+    graphics::rect(d$layer - w, d$deductible, d$layer + w, d$top,
+                   col = "#dce6f6", border = "#2357a8", lwd = 2)
+    graphics::text(d$layer, (d$deductible + d$top) / 2, d$terms,
+                   font = 2, col = "#16233f")
+    graphics::text(d$layer, d$top, d$aggregate, pos = 3, cex = 0.8,
+                   col = "#69707c")
   })
 
   # Initialise this session's data from the process-level store, so a refresh
