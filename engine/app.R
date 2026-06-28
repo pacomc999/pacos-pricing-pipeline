@@ -362,8 +362,6 @@ ui <- shiny::fluidPage(
         shiny::tags$p("A blank aggregate is not the same as 0: blank turns the",
           " control off, while 0 would mean a zero deductible or a zero limit.")
       ),
-      shiny::helpText("Define the reinsurance layers to price. Each row is a cover excess of a deductible. Add or remove layers."),
-      shiny::helpText("Leave AAD blank for no aggregate deductible, and AAL blank for an unlimited aggregate. A blank is not the same as 0."),
       shiny::fluidRow(
         shiny::column(3, shiny::tags$strong("Deductible")),
         shiny::column(3, shiny::tags$strong("Cover")),
