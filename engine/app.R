@@ -727,6 +727,17 @@ server <- function(input, output, session) {
   )
 }
 
+# If the app starts but no browser ever connects (a 'lost' launch, e.g. the tab
+# never opened), it would otherwise linger forever as an orphan process, since
+# the per-session shutdown above only runs once a session exists. This runs once
+# at startup and stops the app if nothing has connected within the timeout. The
+# timeout is an option so tests can use a short value; it defaults to 60 seconds.
+app_onstart <- function() {
+  later::later(function() {
+    if (.app_sessions$count <= 0L) shiny::stopApp()
+  }, delay = getOption("ppp.no_connect_timeout", 60))
+}
+
 # Returning the app object is the standard app.R contract: shiny::runApp('.')
 # launches it, while sourcing this file (in tests) only builds it.
-shiny::shinyApp(ui, server)
+shiny::shinyApp(ui, server, onStart = app_onstart)
