@@ -54,7 +54,7 @@ step has a collapsible "More information" panel that explains what it does.
 
 | Step | Name | What you do |
 |------|------|-------------|
-| 1 | Data | Upload the workbook and review the losses, exposure and inflation that loaded. |
+| 1 | Data | Upload the workbook and review the general inputs, losses, exposure and inflation that loaded. |
 | 2 | Model | Choose the modelling threshold, the splice threshold and the frequency model, while live plots show the fit. |
 | 3 | Structure | Define the reinsurance layers (deductible, cover, aggregate deductible, aggregate limit). |
 | 4 | Price | Set the loadings and the simulation size, run the pricing, and read the results and validation. |
@@ -125,6 +125,24 @@ All commands below run from inside the `engine/` folder.
 A single Excel workbook with four sheets. The reinsurance structure is **not**
 in the workbook; it is defined in the dashboard.
 
+**Sheet `general inputs`** (key and value rows; an optional `notes` column may
+describe each field and is ignored by the reader):
+
+| key | example | required | notes |
+|-----|---------|----------|-------|
+| `valuation_year` | 2026 | yes | the year all losses are revalued to |
+| `currency` | EUR | no | labels every amount in the dashboard and the export |
+| `amount_units` | millions | no | labels the scale of the figures, e.g. millions |
+
+The workbook may optionally also carry modelling defaults (modelling threshold,
+splice threshold, frequency model, simulations, loadings, VaR level). When
+present they seed the dashboard controls. The precedence is: dashboard control
+overrides the workbook value, which overrides the built-in default (see
+`resolve_settings` in `pipeline.R`). The modelling threshold has no fixed
+built-in default: when neither the dashboard nor the workbook sets it, it starts
+at the smallest loss in the history, so the model includes every loss until you
+raise it.
+
 **Sheet `losses`** (one row per individual loss):
 
 | column | type | notes |
@@ -148,24 +166,6 @@ constant):
 |--------|------|-------|
 | `year` | integer | |
 | `inflation` | numeric | loss inflation during that year, for example 0.03 for 3% |
-
-**Sheet `general inputs`** (key and value rows; an optional `notes` column may
-describe each field and is ignored by the reader):
-
-| key | example | required | notes |
-|-----|---------|----------|-------|
-| `valuation_year` | 2026 | yes | the year all losses are revalued to |
-| `currency` | EUR | no | labels every amount in the dashboard and the export |
-| `amount_units` | millions | no | labels the scale of the figures, e.g. millions |
-
-The workbook may optionally also carry modelling defaults (modelling threshold,
-splice threshold, frequency model, simulations, loadings, VaR level). When
-present they seed the dashboard controls. The precedence is: dashboard control
-overrides the workbook value, which overrides the built-in default (see
-`resolve_settings` in `pipeline.R`). The modelling threshold has no fixed
-built-in default: when neither the dashboard nor the workbook sets it, it starts
-at the smallest loss in the history, so the model includes every loss until you
-raise it.
 
 ## Output
 
