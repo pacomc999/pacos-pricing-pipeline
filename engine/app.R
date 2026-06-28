@@ -172,6 +172,15 @@ app_css <- shiny::tags$style(shiny::HTML("
   .info-panel .info-body p { margin-bottom: 8px; }
   .info-panel .info-body ul { margin-bottom: 0; padding-left: 20px; }
   .info-panel .info-body li { margin-bottom: 4px; }
+
+  /* Premium method card: groups one loading with the formula it drives, so the
+     two methods read as alternatives rather than margins added together */
+  .method-card { background: var(--bg-main); border: 1px solid var(--border);
+                 border-radius: 6px; padding: 12px 14px 2px; margin-bottom: 14px; }
+  .method-card .method-title { font-weight: 600; color: var(--navy-mid);
+                 font-size: 14px; margin-bottom: 2px; }
+  .method-card .method-formula { color: var(--text-muted); font-size: 12px;
+                 margin-bottom: 8px; }
 "))
 
 # A collapsible 'More information' panel for the top of a step. It starts closed
@@ -181,6 +190,17 @@ info_panel <- function(...) {
   shiny::tags$details(class = "info-panel",
     shiny::tags$summary("More information"),
     shiny::tags$div(class = "info-body", ...)
+  )
+}
+
+# A titled card for one premium method: its name, the formula it uses, and the
+# loading input that drives it. Shows the two methods are alternatives, each with
+# its own premium, rather than two margins added together.
+method_card <- function(title, formula, input) {
+  shiny::tags$div(class = "method-card",
+    shiny::tags$div(class = "method-title", title),
+    shiny::tags$div(class = "method-formula", formula),
+    input
   )
 }
 
@@ -317,11 +337,14 @@ ui <- shiny::fluidPage(
           " runs the Monte Carlo simulation: it draws many simulated years from",
           " the fitted frequency and severity, applies each layer, and turns the",
           " resulting losses into a premium."),
+        shiny::tags$p(shiny::tags$strong("Two premium methods."),
+          " The tool prices each layer both ways and shows both so you can",
+          " compare. They are alternatives, not added together:"),
         shiny::tags$ul(
-          shiny::tags$li(shiny::tags$strong("Loading (expected value)"),
-            ": a margin added in proportion to the expected loss."),
-          shiny::tags$li(shiny::tags$strong("Loading (std dev)"),
-            ": a margin added in proportion to the loss volatility."),
+          shiny::tags$li(shiny::tags$strong("Expected value method"),
+            ": premium = (1 + loading) × expected loss. A flat margin on top of the average loss."),
+          shiny::tags$li(shiny::tags$strong("Standard deviation method"),
+            ": premium = expected loss + loading × volatility. A margin that grows with how volatile the layer is."),
           shiny::tags$li(shiny::tags$strong("VaR / TVaR level"),
             ": the percentile used for the tail risk measures."),
           shiny::tags$li(shiny::tags$strong("Simulations"),
@@ -335,8 +358,12 @@ ui <- shiny::fluidPage(
       ),
       shiny::fluidRow(
         shiny::column(4,
-          shiny::numericInput("load_ev", "Loading (expected value)", value = 0.1, step = 0.05),
-          shiny::numericInput("load_sd", "Loading (std dev)", value = 0.2, step = 0.05),
+          method_card("Expected value method",
+                      "Premium = (1 + loading) × expected loss",
+                      shiny::numericInput("load_ev", "Loading", value = 0.1, step = 0.05)),
+          method_card("Standard deviation method",
+                      "Premium = expected loss + loading × std dev",
+                      shiny::numericInput("load_sd", "Loading", value = 0.2, step = 0.05)),
           shiny::numericInput("var_level", "VaR / TVaR level", value = 0.99, min = 0.5, max = 0.999, step = 0.005),
           shiny::numericInput("nsim", "Simulations", value = 100000, min = 1000, step = 1000),
           shiny::numericInput("seed", "Random seed", value = 1),
