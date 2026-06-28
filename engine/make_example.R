@@ -59,6 +59,11 @@ col_style <- function(name, n, col, style) {
   openxlsx::addStyle(wb, name, style, rows = 2:(n + 1), cols = col, gridExpand = TRUE)
 }
 
+add_sheet("general inputs", parameters, c(18, 12, 52))
+col_style("general inputs", nrow(parameters), 1, cell_st)
+col_style("general inputs", nrow(parameters), 2, cell_st)
+col_style("general inputs", nrow(parameters), 3, cell_st)
+
 add_sheet("losses", losses, c(10, 14, 20))
 col_style("losses", nrow(losses), 1, yr_st)
 col_style("losses", nrow(losses), 2, num_st)
@@ -71,11 +76,6 @@ col_style("exposure", nrow(exposure), 2, num_st)
 add_sheet("inflation", inflation, c(10, 14))
 col_style("inflation", nrow(inflation), 1, yr_st)
 col_style("inflation", nrow(inflation), 2, pct_st)
-
-add_sheet("general inputs", parameters, c(18, 12, 52))
-col_style("general inputs", nrow(parameters), 1, cell_st)
-col_style("general inputs", nrow(parameters), 2, cell_st)
-col_style("general inputs", nrow(parameters), 3, cell_st)
 
 openxlsx::saveWorkbook(wb, "../input.xlsx", overwrite = TRUE)
 cat("Wrote input.xlsx\n")

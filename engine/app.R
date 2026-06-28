@@ -301,13 +301,14 @@ ui <- shiny::fluidPage(
       shiny::helpText("Your upload stays loaded across page refreshes."),
       shiny::uiOutput("data_info"),
       shiny::fluidRow(
-        shiny::column(6, shiny::tags$h4("Losses"),
+        shiny::column(6,
+          shiny::tags$h4("General inputs"),
+          shiny::tableOutput("data_params"),
+          shiny::tags$h4("Losses"),
           shiny::tags$div(class = "loss-scroll", shiny::tableOutput("loss_preview"))),
         shiny::column(6,
           shiny::tags$h4("Exposure & inflation by year"),
-          shiny::tags$div(class = "loss-scroll", shiny::tableOutput("year_table")),
-          shiny::tags$h4("Data parameters"),
-          shiny::tableOutput("data_params"))
+          shiny::tags$div(class = "loss-scroll", shiny::tableOutput("year_table")))
       ),
       step_nav(next_id = "nav_1_next", next_label = "Next: Model")),
 
