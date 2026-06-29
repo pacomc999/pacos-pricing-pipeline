@@ -22,9 +22,9 @@ write_tmp_workbook <- function() {
     key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level",
-            "currency", "amount_units"),
+            "currency", "amount_units", "reporting_threshold"),
     value = c("5", "15", "poisson", "100000", "2026",
-              "0.1", "0.2", "0.99", "EUR", "millions")
+              "0.1", "0.2", "0.99", "EUR", "millions", "2")
   ))
   openxlsx::saveWorkbook(wb, path)
   path
@@ -46,6 +46,9 @@ test_that("read_input parses all four sheets with correct types", {
   expect_equal(input$parameters$currency, "EUR")
   expect_equal(input$parameters$amount_units, "millions")
 
+  # The reporting threshold is read as a number when present.
+  expect_equal(input$parameters$reporting_threshold, 2)
+
   # Inflation is a per-year table now, not a single parameter.
   expect_null(input$parameters$loss_inflation_pa)
   expect_equal(nrow(input$inflation), 5)
@@ -55,23 +58,35 @@ test_that("read_input parses all four sheets with correct types", {
   expect_null(input$contract)
 })
 
-test_that("read_input accepts a workbook with only the required data parameter", {
+test_that("read_input accepts a workbook with only the required general inputs", {
   path <- write_tmp_workbook()
   wb <- openxlsx::loadWorkbook(path)
   openxlsx::removeWorksheet(wb, "general inputs")
   openxlsx::addWorksheet(wb, "general inputs")
-  # Only the required data parameter; modelling choices are set in the UI.
+  # Only the required general inputs; modelling choices are set in the UI.
   openxlsx::writeData(wb, "general inputs", data.frame(
-    key = "valuation_year", value = "2026"))
+    key = c("valuation_year", "reporting_threshold"),
+    value = c("2026", "2")))
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
 
   input <- read_input(path)
   expect_equal(input$parameters$valuation_year, 2026)
-  expect_null(input$parameters$reporting_threshold)          # no longer read
+  expect_equal(input$parameters$reporting_threshold, 2)      # required, present
   expect_true(is.na(input$parameters$modelling_threshold))   # optional, absent
   expect_true(is.na(input$parameters$frequency_model))
   expect_true(is.na(input$parameters$currency))              # optional, absent
   expect_true(is.na(input$parameters$amount_units))
+})
+
+test_that("read_input errors when the required reporting threshold is missing", {
+  path <- write_tmp_workbook()
+  wb <- openxlsx::loadWorkbook(path)
+  openxlsx::removeWorksheet(wb, "general inputs")
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
+    key = "valuation_year", value = "2026"))   # reporting_threshold omitted
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  expect_error(read_input(path), "reporting_threshold")
 })
 
 test_that("read_input errors clearly on a missing required parameter", {

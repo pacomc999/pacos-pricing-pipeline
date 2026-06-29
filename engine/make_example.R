@@ -22,14 +22,15 @@ exposure <- data.frame(year = 2021:2026, exposure = c(120, 120, 130, 140, 145, 1
 # rate is the inflation experienced during that year and accrues on losses from
 # earlier years when they are revalued to the valuation year.
 inflation <- data.frame(year = 2021:2026, inflation = c(0.02, 0.03, 0.025, 0.04, 0.03, 0.035))
-# Only the general inputs live in the workbook; the modelling choices (thresholds,
-# frequency model, simulations, loadings) are set in the dashboard. The valuation
-# year is required; currency and amount units are optional and only label figures.
-# The notes column documents this in the sheet; read_input ignores extra columns.
+# Only the general inputs live in the workbook; the modelling choices (frequency
+# model, simulations, loadings) are set in the dashboard. The valuation year and
+# reporting threshold are required; currency and amount units are optional. The
+# notes column documents this in the sheet; read_input ignores extra columns.
 parameters <- data.frame(
-  key   = c("valuation_year", "currency", "amount_units"),
-  value = c("2026", "EUR", "millions"),
+  key   = c("valuation_year", "reporting_threshold", "currency", "amount_units"),
+  value = c("2026", "2", "EUR", "millions"),
   notes = c("Required: the year losses are revalued to.",
+            "Required: the loss size above which the data is complete.",
             "Optional: shown next to amounts.",
             "Optional: shown next to amounts (e.g. millions, thousands)."))
 

@@ -18,9 +18,10 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
-            "valuation_year", "loading_ev", "loading_sd", "var_level"),
+            "valuation_year", "loading_ev", "loading_sd", "var_level",
+            "reporting_threshold"),
     value = c("5", "5", "poisson", "200000", "2025",
-              "0.1", "0.2", "0.99")))
+              "0.1", "0.2", "0.99", "2")))
   openxlsx::saveWorkbook(wb, path)
 
   # The contract is supplied by the caller (dashboard or, here, the test); it is
@@ -57,9 +58,10 @@ test_that("frequency window excludes the prospective valuation year", {
   openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
-            "valuation_year", "loading_ev", "loading_sd", "var_level"),
+            "valuation_year", "loading_ev", "loading_sd", "var_level",
+            "reporting_threshold"),
     value = c("5", "5", "poisson", "1000", "2024",
-              "0.1", "0.2", "0.99")))
+              "0.1", "0.2", "0.99", "2")))
   openxlsx::saveWorkbook(wb, path)
 
   res <- run_pricing(path, seed = 1)   # default contract; frequency is unaffected
@@ -85,9 +87,9 @@ test_that("a growing book scales the projected frequency by exposure", {
   openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold", "splice_threshold",
             "frequency_model", "n_simulations", "valuation_year",
-            "loading_ev", "loading_sd", "var_level"),
+            "loading_ev", "loading_sd", "var_level", "reporting_threshold"),
     value = c("5", "5", "poisson", "1000", "2024",
-              "0.1", "0.2", "0.99")))
+              "0.1", "0.2", "0.99", "2")))
   openxlsx::saveWorkbook(wb, path)
 
   res <- run_pricing(path, seed = 1)
@@ -110,7 +112,8 @@ test_that("dashboard-style overrides drive a data-only workbook", {
     year = 2021:2025, inflation = rep(0, 5)))
   openxlsx::addWorksheet(wb, "general inputs")
   openxlsx::writeData(wb, "general inputs", data.frame(
-    key = "valuation_year", value = "2025"))
+    key = c("valuation_year", "reporting_threshold"),
+    value = c("2025", "2")))
   openxlsx::saveWorkbook(wb, path)
 
   contract <- data.frame(
@@ -126,19 +129,17 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   expect_true(abs(res$expected_loss[3] - 2.12) < 0.15)
 })
 
-test_that("resolve_settings defaults the modelling threshold to the smallest loss", {
-  params <- list(valuation_year = 2026L)   # no modelling_threshold in the workbook
-  losses <- c(8, 6, 12, 6, 30)
+test_that("resolve_settings defaults the modelling threshold to the reporting threshold", {
+  params <- list(valuation_year = 2026L, reporting_threshold = 5)
 
-  # Default: the smallest historical loss, so the model includes every loss.
-  expect_equal(resolve_settings(params, losses = losses)$modelling_threshold, 6)
+  # Default: the reporting threshold (the loss size above which data is complete).
+  expect_equal(resolve_settings(params)$modelling_threshold, 5)
 
   # A workbook modelling_threshold still wins over the default.
   params_mt <- c(params, list(modelling_threshold = 9))
-  expect_equal(resolve_settings(params_mt, losses = losses)$modelling_threshold, 9)
+  expect_equal(resolve_settings(params_mt)$modelling_threshold, 9)
 
   # A dashboard override wins over everything.
   expect_equal(
-    resolve_settings(params_mt, overrides = list(modelling_threshold = 4),
-                     losses = losses)$modelling_threshold, 4)
+    resolve_settings(params_mt, overrides = list(modelling_threshold = 4))$modelling_threshold, 4)
 })

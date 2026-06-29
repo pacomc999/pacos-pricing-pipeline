@@ -4,11 +4,11 @@ fit_pareto_alpha <- function(x, x0) {
   length(x) / sum(log(x / x0))
 }
 
-# Fits the spliced severity conditional on X >= mt: lognormal body on [mt, s],
+# Fits the spliced severity conditional on X > mt: lognormal body on (mt, s],
 # Pareto tail on (s, Inf). Continuity at s comes from the mixture weight.
 fit_severity <- function(loss_values, mt, s) {
-  modelled <- loss_values[loss_values >= mt]  # losses at or above MT are modelled
-  body <- modelled[modelled <= s]             # [mt, s]
+  modelled <- loss_values[loss_values > mt]   # only losses above MT are modelled
+  body <- modelled[modelled <= s]             # (mt, s]
   tail <- modelled[modelled > s]              # (s, Inf)
   # The Pareto tail needs data above s; without it alpha is undefined (NaN).
   if (length(tail) < 1) {
@@ -24,8 +24,22 @@ fit_severity <- function(loss_values, mt, s) {
                   sdlog   = unname(fit$estimate["sdlog"]))
   }
 
-  list(mt = mt, s = s, weight = weight, lnorm = lnorm,
+  list(mt = mt, s = s, weight = weight, lnorm = lnorm, n_body = length(body),
        pareto = list(x0 = s, alpha = fit_pareto_alpha(tail, s)))
+}
+
+# Caution for the dashboard when the lognormal body is fitted on too few losses.
+# Returns NULL when the body is inactive (n_body == 0, e.g. splice = mt, which
+# gives a single Pareto) or when there are enough points (n_body >= n_min);
+# otherwise a message nudging the user back to a single Pareto. n_min defaults to
+# 10 (about five losses per lognormal parameter): reinsurance samples are usually
+# too small to support the extra body parameters reliably.
+severity_body_warning <- function(n_body, n_min = 10) {
+  if (n_body == 0 || n_body >= n_min) return(NULL)
+  paste0("The lognormal body is fitted on only ", n_body,
+         if (n_body == 1) " loss" else " losses",
+         " - too few for a reliable fit. Lower the splice threshold to the",
+         " modelling threshold to use a single Pareto.")
 }
 
 # Conditional survival S(t) = P(X > t | X > mt), vectorised over t.

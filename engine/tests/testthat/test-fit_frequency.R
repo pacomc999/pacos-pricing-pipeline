@@ -5,14 +5,6 @@ test_that("annual_counts includes zero-loss years", {
   expect_equal(counts, c(2, 0, 1, 3, 1))   # 2022 is a zero year
 })
 
-test_that("annual_counts is inclusive of losses exactly at the threshold", {
-  # Two losses sit exactly on the threshold; both must be counted.
-  losses <- data.frame(year = c(2021, 2021, 2022),
-                       loss = c(5, 8, 5))
-  counts <- annual_counts(losses, years = 2021:2022, threshold = 5)
-  expect_equal(counts, c(2, 1))
-})
-
 test_that("Poisson fit matches the notes lambda of 1.4", {
   counts <- c(2, 0, 1, 3, 1)
   fit <- fit_frequency(counts, "poisson")

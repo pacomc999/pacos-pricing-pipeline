@@ -42,6 +42,9 @@ read_input <- function(path) {
   }
   parameters <- list(
     valuation_year      = as.integer(num("valuation_year")),
+    # The loss size above which the data is complete (required). It bounds the
+    # modelling threshold from below.
+    reporting_threshold = num("reporting_threshold"),
     currency            = opt_chr("currency"),
     amount_units        = opt_chr("amount_units"),
     modelling_threshold = opt_num("modelling_threshold"),

@@ -309,7 +309,7 @@ ui <- shiny::fluidPage(
           " with the tool. You do not build it yourself; you just fill your own",
           " figures into its four sheets:"),
         shiny::tags$ul(
-          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (required, the year losses are revalued to), plus an optional currency and amount units that label the figures."),
+          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (the year losses are revalued to) and the reporting threshold (the loss size above which the data is complete), both required, plus an optional currency and amount units that label the figures."),
           shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
           shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year."),
           shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year.")
@@ -386,6 +386,7 @@ ui <- shiny::fluidPage(
             shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
             shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold.")),
           shiny::column(8,
+            shiny::uiOutput("sev_body_warning"),
             shiny::plotOutput("sev_plot"),
             shiny::tableOutput("sev_params")))
       ),
@@ -686,9 +687,10 @@ server <- function(input, output, session) {
       else as.character(x)
     }
     data.frame(
-      Parameter = c("Valuation year", "Currency", "Amount units"),
-      Value = c(as.character(p$valuation_year), shown(p$currency),
-                shown(p$amount_units)),
+      Parameter = c("Valuation year", "Reporting threshold",
+                    "Currency", "Amount units"),
+      Value = c(as.character(p$valuation_year), as.character(p$reporting_threshold),
+                shown(p$currency), shown(p$amount_units)),
       check.names = FALSE
     )
   })
@@ -696,7 +698,7 @@ server <- function(input, output, session) {
   # When a workbook is loaded, seed the controls from its defaults (or built-in
   # defaults) so the user starts from a sensible point.
   shiny::observeEvent(input_data(), {
-    st <- resolve_settings(input_data()$parameters, losses = input_data()$losses$loss)
+    st <- resolve_settings(input_data()$parameters)
     shiny::updateNumericInput(session, "mt", value = st$modelling_threshold)
     shiny::updateNumericInput(session, "s", value = st$splice_threshold)
     shiny::updateSelectInput(session, "freq", selected = st$frequency_model)
@@ -731,7 +733,7 @@ server <- function(input, output, session) {
   output$sev_plot <- shiny::renderPlot(bg = "#f4f7fc", {
     f <- fits()
     fit <- f$fit_severity
-    above <- f$losses$loss_indexed[f$losses$loss_indexed >= fit$mt]
+    above <- f$losses$loss_indexed[f$losses$loss_indexed > fit$mt]
     xs <- seq(fit$mt, max(above), length.out = 200)
     u <- money_units()
     xlab_txt <- if (nzchar(u)) paste0("Loss (", u, ")") else "Loss"
@@ -751,6 +753,15 @@ server <- function(input, output, session) {
     legend("bottomright", c("Fitted", "Empirical", "Splice threshold"),
            col = c("black", "grey50", "blue"), lty = c(1, 1, 2),
            lwd = 2.5, bty = "n")
+  })
+
+  # Caution (amber, non-blocking) when the splice is raised so the lognormal body
+  # is fitted on too few losses. Empty when the body is inactive (splice = mt) or
+  # there is enough data, so the recommended single-Pareto default stays silent.
+  output$sev_body_warning <- shiny::renderUI({
+    msg <- severity_body_warning(fits()$fit_severity$n_body)
+    if (is.null(msg)) return(NULL)
+    shiny::tags$div(class = "stale-banner", msg)
   })
 
   # Fitted vs empirical frequency: the probability of each yearly claim count,

@@ -131,6 +131,7 @@ describe each field and is ignored by the reader):
 | key | example | required | notes |
 |-----|---------|----------|-------|
 | `valuation_year` | 2026 | yes | the year all losses are revalued to |
+| `reporting_threshold` | 2 | yes | the loss size above which the data is complete; it bounds the modelling threshold from below |
 | `currency` | EUR | no | labels every amount in the dashboard and the export |
 | `amount_units` | millions | no | labels the scale of the figures, e.g. millions |
 
@@ -138,11 +139,11 @@ The workbook may optionally also carry modelling defaults (modelling threshold,
 splice threshold, frequency model, simulations, loadings, VaR level). When
 present they seed the dashboard controls. The precedence is: dashboard control
 overrides the workbook value, which overrides the built-in default (see
-`resolve_settings` in `pipeline.R`). The modelling threshold has no fixed
-built-in default: when neither the dashboard nor the workbook sets it, it starts
-at the smallest loss in the history, so the model includes every loss until you
-raise it. The threshold is inclusive: losses exactly at the modelling threshold
-are modelled, and only smaller losses are ignored.
+`resolve_settings` in `pipeline.R`). When neither the dashboard nor the workbook
+sets the modelling threshold, it defaults to the reporting threshold (the loss
+size above which the data is complete), so the model starts exactly where the
+data becomes reliable. The threshold is strict: only losses above it are
+modelled.
 
 **Sheet `losses`** (one row per individual loss):
 
