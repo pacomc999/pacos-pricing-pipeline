@@ -397,7 +397,7 @@ ui <- shiny::fluidPage(
       shiny::fluidRow(
         shiny::column(4,
           shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
-          shiny::helpText("The loss size where modelling starts; smaller losses are ignored."))
+          shiny::uiOutput("mt_help"))
       ),
       # Frequency calibration: the model choice and its fitted summary.
       calib_card("Frequency calibration",
@@ -602,6 +602,25 @@ server <- function(input, output, session) {
     build_contract_df(do.call(rbind, rows))
   })
 
+  # The lowest layer deductible across the live structure. The modelling
+  # threshold defaults to this and may not exceed it: losses below the lowest
+  # deductible never reach any layer, so modelling above it would miss losses
+  # that price into the lowest layer.
+  lowest_deductible <- shiny::reactive({
+    d <- contract()$deductible
+    d <- d[!is.na(d)]
+    if (length(d) == 0) return(NA_real_)
+    min(d)
+  })
+
+  # The reporting threshold from the workbook (read straight from rv$data so it
+  # is available before the fit). The modelling threshold may not sit below it:
+  # under it the data is incomplete, so the frequency would be understated.
+  reporting_threshold <- shiny::reactive({
+    rt <- rv$data$parameters$reporting_threshold
+    if (is.null(rt)) NA_real_ else rt
+  })
+
   # Live tower plot of the layer structure, so the user can visually check the
   # program. Reads the same contract() as pricing, so it always matches.
   output$structure_plot <- shiny::renderPlot({
@@ -707,8 +726,9 @@ server <- function(input, output, session) {
   # defaults) so the user starts from a sensible point.
   shiny::observeEvent(input_data(), {
     st <- resolve_settings(input_data()$parameters)
-    shiny::updateNumericInput(session, "mt", value = st$modelling_threshold)
-    shiny::updateNumericInput(session, "s", value = st$splice_threshold)
+    # The modelling and splice thresholds are seeded from the structure (the
+    # lowest deductible) when the user reaches the Model step, not here, since
+    # the structure is defined on the previous step.
     # Start spliced only if the workbook places the splice above the threshold;
     # otherwise the single Pareto (the recommended default) is selected.
     shiny::updateSelectInput(session, "sev_model",
@@ -719,6 +739,47 @@ server <- function(input, output, session) {
     shiny::updateNumericInput(session, "load_ev", value = st$loading_ev)
     shiny::updateNumericInput(session, "load_sd", value = st$loading_sd)
     shiny::updateNumericInput(session, "var_level", value = st$var_level)
+  })
+
+  # Default the modelling (and splice) threshold to the lowest layer deductible
+  # the first time the user reaches the Model step (Arbenz's convention: model
+  # from where the lowest layer starts). Only fills an unset (NA) threshold, so a
+  # value the user typed is preserved; the observer fires on tab change only.
+  shiny::observeEvent(input$step, {
+    if (!identical(input$step, "model")) return()
+    if (!is.null(input$mt) && !is.na(input$mt)) return()
+    ld <- lowest_deductible()
+    if (is.na(ld)) return()
+    shiny::updateNumericInput(session, "mt", value = ld)
+    shiny::updateNumericInput(session, "s", value = ld)
+  })
+
+  # Keep the modelling threshold inside its valid window: at or above the
+  # reporting threshold (below it the data is incomplete) and at or below the
+  # lowest layer deductible (above it the lowest layer's losses go unmodelled).
+  # Snapping the input back beats letting an out-of-range value break the fit.
+  # Fires on threshold edits and when the bounds move (new workbook or changed
+  # structure); it settles because an in-range value triggers no further update.
+  shiny::observe({
+    v <- input$mt
+    lo <- reporting_threshold(); hi <- lowest_deductible()
+    if (is.null(v) || is.na(v)) return()
+    clamped <- v
+    if (!is.na(hi) && clamped > hi) clamped <- hi
+    if (!is.na(lo) && clamped < lo) clamped <- lo
+    if (clamped != v) shiny::updateNumericInput(session, "mt", value = clamped)
+  })
+
+  # Helptext under the modelling threshold, naming its valid window with the
+  # live reporting threshold and lowest deductible for reference.
+  output$mt_help <- shiny::renderUI({
+    base <- "The loss size where modelling starts; smaller losses are ignored."
+    lo <- reporting_threshold(); hi <- lowest_deductible()
+    if (!is.na(lo) && !is.na(hi)) {
+      base <- paste0(base, " It must be between the reporting threshold (", lo,
+                     ") and the lowest layer deductible (", hi, ").")
+    }
+    shiny::helpText(base)
   })
 
   # Current modelling settings from the controls. The single Pareto is just the
@@ -736,6 +797,15 @@ server <- function(input, output, session) {
   fits <- shiny::reactive({
     inp <- input_data()
     shiny::validate(shiny::need(!is.na(input$mt), "Set the modelling threshold."))
+    # The modelling threshold is kept inside [reporting threshold, lowest
+    # deductible] by clamping the input, so it never breaks the fit here. The
+    # one case that can: a window that does not exist (reporting threshold above
+    # the lowest deductible), which is a workbook/structure mismatch worth flagging.
+    lo <- reporting_threshold(); hi <- lowest_deductible()
+    shiny::validate(shiny::need(
+      is.na(lo) || is.na(hi) || lo <= hi,
+      paste0("The reporting threshold (", lo, ") is above the lowest layer deductible (",
+             hi, "). Lower the reporting threshold in the workbook or raise the deductible.")))
     # The splice threshold is only needed (and shown) for the spliced model.
     if (identical(input$sev_model, "spliced")) {
       shiny::validate(
