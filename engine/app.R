@@ -400,6 +400,17 @@ ui <- shiny::fluidPage(
         shiny::tags$p(shiny::tags$strong("This step"),
           " fits the two ingredients of the price: how often losses happen",
           " (frequency) and how big they are (severity)."),
+        shiny::tags$p("Before either model is fitted, every historical loss is",
+          " trended to the valuation year for loss inflation: each loss is",
+          " multiplied by the inflation since its year, restating old losses in",
+          " today's money. Both the frequency and the severity are fitted on these",
+          " inflation-trended losses, so the price reflects today's loss sizes."),
+        shiny::tags$p("Exposure is handled separately, on the frequency side. The",
+          " expected number of claims is the historical rate scaled to the book",
+          " being priced: the valuation-year exposure relative to the average over",
+          " the observed years. Exposure is a volume measure, so a larger book is",
+          " expected to produce proportionally more claims, not larger ones, and it",
+          " does not change the loss sizes (the severity)."),
         shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("Frequency model"),
             ": how the yearly count of losses is distributed (Poisson, Negative Binomial or Binomial)."),
@@ -988,8 +999,10 @@ server <- function(input, output, session) {
       out <- price_models(f, ct, st, input$seed)
       shiny::incProgress(0.3, detail = "Summarising results")
       # Empirical benchmark for validation: the average annual loss to each layer
-      # on an as-if basis (losses indexed and exposure corrected), in layer order.
-      out$burning_cost <- burning_cost(f$losses, ct)
+      # on an as-if basis (losses trended for inflation, then on-levelled to the
+      # valuation-year book by exposure), in layer order.
+      out$burning_cost <- burning_cost(f$losses, ct, inp$exposure,
+                                       inp$parameters$valuation_year)
       out
     })
   })

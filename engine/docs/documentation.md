@@ -35,9 +35,10 @@ This document has two main parts:
 At a high level the tool turns a history of losses into a price through four
 stages:
 
-1. **Pre-process.** Each historical loss is revalued to the valuation year for
-   inflation and for the change in exposure, so old losses are stated in
-   today's money and today's book size.
+1. **Pre-process.** Each historical loss is trended to the valuation year for
+   loss inflation, so old losses are stated in today's money. The change in book
+   size is handled separately, on the frequency side (exposure is a volume
+   measure).
 2. **Fit.** A frequency distribution is fitted to the yearly count of losses,
    and a severity distribution is fitted to the size of losses.
 3. **Simulate.** A Monte Carlo simulation draws many possible years from the
@@ -190,7 +191,7 @@ modules; it contains no pricing mathematics of its own.
 |--------|----------------|
 | `io.R` | read the input workbook, write the output workbook |
 | `layers.R` | the per-loss layer function and the default program |
-| `preprocess.R` | indexation, exposure correction, burning cost |
+| `preprocess.R` | inflation indexation, exposure scaling, burning cost |
 | `fit_frequency.R` | fit and scale Poisson, Negative Binomial or Binomial |
 | `fit_severity.R` | fit the spliced lognormal and Pareto, survival, sampler |
 | `simulate.R` | Monte Carlo of annual ground-up losses |
@@ -225,8 +226,9 @@ number of losses in a year.
 ## Pre-processing: indexation and exposure
 
 Historical losses cannot be used as they are: they happened in different years,
-under different price levels and different book sizes. Two adjustments revalue
-each loss to the valuation year.
+under different price levels and in books of different sizes. Loss inflation is
+handled by revaluing each loss size; exposure is handled separately, on the
+frequency side, because it is a volume measure.
 
 **Loss inflation (indexation).** A loss is in money of its own year, so to
 restate it in valuation-year money we compound the inflation rates of the years
@@ -237,30 +239,32 @@ $$ f^{infl}_{y} = \prod_{t = y+1}^{V} (1 + r_t) $$
 where $y$ is the loss year, $V$ is the valuation year and $r_t$ is the inflation
 rate for year $t$. If the valuation year is earlier than the loss year the same
 product deflates instead (the factor is inverted). This is `inflation_factor` in
-`preprocess.R`.
+`preprocess.R`. The inflation-trended loss that both the severity fit and the
+frequency count read is therefore
 
-**Exposure correction (on-levelling).** The size of a loss is also scaled by how
-the book grew or shrank between the loss year and the valuation year:
+$$ X^{indexed} = X \cdot f^{infl}_{y}. $$
 
-$$ f^{expo}_{y} = \frac{E_V}{E_y} $$
-
-where $E_y$ is the exposure in year $y$. This is `exposure_factor`.
-
-The indexed loss used everywhere downstream is therefore
-
-$$ X^{indexed} = X \cdot f^{infl}_{y} \cdot f^{expo}_{y}. $$
-
-**Exposure and frequency.** Exposure plays a second, separate role. A larger
-prospective book is expected to produce proportionally more claims, so the
-fitted frequency is scaled by the forward book size relative to the average book
-size over the observed years:
+**Exposure drives frequency, not severity.** Exposure is a volume measure (for
+example the number of risks or buildings insured): it governs how many claims
+happen, not how big each one is, so it is deliberately not applied to the loss
+size. A larger prospective book is expected to produce proportionally more
+claims, so the fitted frequency is scaled by the forward book size relative to
+the average over the observed years:
 
 $$ f^{freq} = \frac{E_V}{\frac{1}{n}\sum_{y \in \text{obs}} E_y}. $$
 
 This is `exposure_frequency_factor`. When exposure is flat this factor is 1 and
 nothing changes; a book that doubles roughly doubles the expected number of
-claims. (The dashboard's information panels now explain both of these exposure
-roles to the user.)
+claims. Treating exposure this way matches standard experience rating, where loss
+amounts are trended for inflation and exposure adjusts the claim count (or, as a
+rate, the denominator), not the size of each loss.
+
+**Burning cost on-levelling.** The empirical burning cost benchmark (below) is
+put on the same forward book by scaling each observed year's layer loss by the
+exposure ratio $E_V / E_y$ (`exposure_factor`). This is again a volume
+adjustment to the year's total layer loss, not a change to individual loss
+sizes. (The dashboard's information panels explain these exposure roles to the
+user.)
 
 ## Frequency model
 
@@ -407,11 +411,11 @@ misleading per-loss figure.
 
 Alongside the oracle, the Validation table also shows the **burning cost**: the
 average annual loss to each layer taken straight from the history, on an as-if
-basis (every past loss indexed for inflation and corrected for exposure, as if it
-had happened in the valuation year). Each historical year is layered per loss and
-then run through the layer's annual aggregate deductible and limit, so the
-benchmark reflects the full layer terms (AAD and AAL included), the same way the
-pricer does. Unlike the oracle, this carries no model, so it is the external
+basis (every past loss trended for inflation, and each year's layer loss then
+on-levelled to the valuation-year book by exposure, as if it had happened now).
+Each historical year is layered per loss and then run through the layer's annual
+aggregate deductible and limit, so the benchmark reflects the full layer terms
+(AAD and AAL included), the same way the pricer does. Unlike the oracle, this carries no model, so it is the external
 sense-check. Where the history is thick the modelled expected
 loss should sit close to it; for a high layer above the historical experience the
 burning cost reads near zero and the fitted Pareto tail is doing the work, which

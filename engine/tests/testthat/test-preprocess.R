@@ -11,27 +11,44 @@ test_that("burning_cost applies the layer's aggregate deductible and limit", {
     year = c(2021, 2021, 2022, 2022),
     loss = c(12, 9, 20, 8))
   losses$loss_indexed <- losses$loss
+  # Flat exposure so the on-levelling factor is 1 and the aggregates are clean.
+  exposure <- data.frame(year = 2021:2023, exposure = c(100, 100, 100))
+  vy <- 2023
 
   # Layer 5 xs 5: per-loss recoveries are 5, 4 (2021) and 5, 3 (2022),
   # so the raw annual aggregates are 9 and 8 (mean 8.5).
   base <- burning_cost(losses, data.frame(
-    deductible = 5, cover = 5, aad = 0, aal = 0))
+    deductible = 5, cover = 5, aad = 0, aal = 0), exposure, vy)
   expect_equal(base$bc_advanced, 8.5)
 
   # An AAD of 6 removes the first 6 of each year: 3 and 2 (mean 2.5).
   with_aad <- burning_cost(losses, data.frame(
-    deductible = 5, cover = 5, aad = 6, aal = 0))
+    deductible = 5, cover = 5, aad = 6, aal = 0), exposure, vy)
   expect_equal(with_aad$bc_advanced, 2.5)
 
   # An AAL of 8 caps each year at 8: 8 and 8 (mean 8).
   with_aal <- burning_cost(losses, data.frame(
-    deductible = 5, cover = 5, aad = 0, aal = 8))
+    deductible = 5, cover = 5, aad = 0, aal = 8), exposure, vy)
   expect_equal(with_aal$bc_advanced, 8)
 })
 
-test_that("index_losses reproduces the notes advanced burning cost basis", {
-  # From Reinsurance Analytics Table 8: 2% inflation, exposure growth to 150.
-  # A flat 2% per-year inflation reproduces the constant-rate result.
+test_that("burning_cost on-levels to the forward book by exposure", {
+  # One 2021 loss of 12, trended 2% per year to 2026 and on-levelled for the
+  # book growing 120 -> 150. Inflation scales the loss size, exposure scales the
+  # year's layer loss (the volume channel), reproducing Reinsurance Analytics
+  # Table 8: 12 * 1.02^5 * (150 / 120) = 13.25 * 1.25 = 16.56.
+  losses <- data.frame(year = 2021, loss = 12)
+  inflation <- data.frame(year = 2021:2026, inflation = rep(0.02, 6))
+  exposure <- data.frame(year = 2021:2026, exposure = c(120, 120, 130, 140, 145, 150))
+  losses <- index_losses(losses, exposure, inflation, list(valuation_year = 2026))
+
+  bc <- burning_cost(losses, data.frame(deductible = 0, cover = 100, aad = 0, aal = 0),
+                     exposure, 2026)
+  expect_equal(round(bc$bc_advanced, 2), 16.56)
+})
+
+test_that("index_losses trends losses for inflation only, not exposure", {
+  # Exposure must not change the loss size: only the 2% inflation applies.
   losses <- data.frame(year = c(2021, 2021), loss = c(12, 9.5),
                        line_of_business = c("x", "x"))
   exposure <- data.frame(year = 2021:2026,
@@ -40,8 +57,8 @@ test_that("index_losses reproduces the notes advanced burning cost basis", {
   params <- list(valuation_year = 2026)
 
   out <- index_losses(losses, exposure, inflation, params)
-  # 12 * 1.02^5 * (150/120) = 13.25 * 1.25 = 16.56 (to 2 dp)
-  expect_equal(round(out$loss_indexed[1], 2), 16.56)
+  # 12 * 1.02^5 = 13.25 (to 2 dp); the 150/120 exposure growth is NOT applied.
+  expect_equal(round(out$loss_indexed[1], 2), 13.25)
 })
 
 test_that("inflation_factor compounds a per-year rate vector", {

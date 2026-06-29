@@ -94,7 +94,7 @@ run_pricing <- function(input_path, overrides = list(),
   fits <- fit_models(input, settings)
   priced <- price_models(fits, contract, settings, seed)
   results <- priced$results
-  bc <- burning_cost(fits$losses, contract)
+  bc <- burning_cost(fits$losses, contract, input$exposure, input$parameters$valuation_year)
 
   if (!is.null(output_path)) {
     assumptions <- data.frame(
