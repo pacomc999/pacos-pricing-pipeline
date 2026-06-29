@@ -310,8 +310,8 @@ ui <- shiny::fluidPage(
           " historical loss list. You load the data here, define the layers to",
           " price, choose how to model it, then run a simulation to get a premium."),
         shiny::tags$p(shiny::tags$strong("This step"),
-          " loads the pricing template, a ready-made Excel workbook provided",
-          " with the tool. You do not build it yourself; you just fill your own",
+          " loads the pricing template, a ready-made Excel workbook. Use the",
+          " Generate template button below to save a copy, then fill your own",
           " figures into its four sheets:"),
         shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (the year losses are revalued to) and the reporting threshold (the loss size above which the data is complete), both required, plus an optional currency and amount units that label the figures."),
@@ -327,6 +327,9 @@ ui <- shiny::fluidPage(
       # so the two preview tables below start at the same height.
       shiny::fluidRow(
         shiny::column(6,
+          shiny::downloadButton("download_template", "Generate template"),
+          shiny::helpText("Saves a copy of the input template (with example data)",
+            " so you can fill in your own figures, then upload it below."),
           shiny::fileInput("file", "Upload the filled-in template (.xlsx)", accept = ".xlsx"),
           shiny::uiOutput("data_info")),
         shiny::column(6,
@@ -685,6 +688,16 @@ server <- function(input, output, session) {
     .app_state$data <- rv$data
     .app_state$name <- rv$name
   })
+
+  # Generate template: writes a fresh copy of the input workbook for the user to
+  # fill in. Independent of the upload above; the browser's save dialog lets the
+  # user choose where it goes and what it is called (default input.xlsx).
+  output$download_template <- shiny::downloadHandler(
+    filename = function() "input.xlsx",
+    content = function(file) {
+      openxlsx::saveWorkbook(build_template_workbook(), file, overwrite = TRUE)
+    }
+  )
 
   input_data <- shiny::reactive({
     shiny::validate(shiny::need(!is.null(rv$data),
