@@ -5,6 +5,30 @@ test_that("apply_layer caps and floors correctly", {
   expect_equal(apply_layer(c(3, 7, 12), 5, 5), c(0, 2, 5))
 })
 
+test_that("burning_cost applies the layer's aggregate deductible and limit", {
+  # Two years, two losses each, all indexed = raw (inflation handled elsewhere).
+  losses <- data.frame(
+    year = c(2021, 2021, 2022, 2022),
+    loss = c(12, 9, 20, 8))
+  losses$loss_indexed <- losses$loss
+
+  # Layer 5 xs 5: per-loss recoveries are 5, 4 (2021) and 5, 3 (2022),
+  # so the raw annual aggregates are 9 and 8 (mean 8.5).
+  base <- burning_cost(losses, data.frame(
+    deductible = 5, cover = 5, aad = 0, aal = 0))
+  expect_equal(base$bc_advanced, 8.5)
+
+  # An AAD of 6 removes the first 6 of each year: 3 and 2 (mean 2.5).
+  with_aad <- burning_cost(losses, data.frame(
+    deductible = 5, cover = 5, aad = 6, aal = 0))
+  expect_equal(with_aad$bc_advanced, 2.5)
+
+  # An AAL of 8 caps each year at 8: 8 and 8 (mean 8).
+  with_aal <- burning_cost(losses, data.frame(
+    deductible = 5, cover = 5, aad = 0, aal = 8))
+  expect_equal(with_aal$bc_advanced, 8)
+})
+
 test_that("index_losses reproduces the notes advanced burning cost basis", {
   # From Reinsurance Analytics Table 8: 2% inflation, exposure growth to 150.
   # A flat 2% per-year inflation reproduces the constant-rate result.

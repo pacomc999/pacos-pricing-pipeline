@@ -49,15 +49,21 @@ index_losses <- function(losses, exposure, inflation, params) {
 }
 
 # Average loss to each layer, simple (raw) and advanced (indexed), per year.
+# Each year's losses are layered per loss and then run through the layer's
+# annual aggregate deductible and limit, so the benchmark uses the same layer
+# definition as the pricer (annual_layer_loss in price.R). The aggregate terms
+# are present-day amounts; the advanced figure indexes losses to today first, so
+# it is the money-consistent comparison shown in the dashboard.
 burning_cost <- function(losses_indexed, contract) {
   years <- sort(unique(losses_indexed$year))
   rows <- lapply(seq_len(nrow(contract)), function(i) {
     D <- contract$deductible[i]; C <- contract$cover[i]
+    aad <- contract$aad[i]; aal <- contract$aal[i]
     simple_by_year <- vapply(years, function(y) {
-      sum(apply_layer(losses_indexed$loss[losses_indexed$year == y], D, C))
+      annual_layer_loss(losses_indexed$loss[losses_indexed$year == y], D, C, aad, aal)
     }, numeric(1))
     adv_by_year <- vapply(years, function(y) {
-      sum(apply_layer(losses_indexed$loss_indexed[losses_indexed$year == y], D, C))
+      annual_layer_loss(losses_indexed$loss_indexed[losses_indexed$year == y], D, C, aad, aal)
     }, numeric(1))
     data.frame(deductible = D, cover = C,
                bc_simple = mean(simple_by_year),
