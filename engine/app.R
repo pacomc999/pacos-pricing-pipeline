@@ -1043,7 +1043,10 @@ server <- function(input, output, session) {
         if (nzchar(money_units()))
           shiny::helpText(paste0("Amounts are in ", money_units(), ".")),
         shiny::tableOutput("results"),
-        shiny::tags$h4("Validation"), shiny::tableOutput("validation"))
+        shiny::tags$h4("Validation"), shiny::tableOutput("validation"),
+        shiny::tags$h4("Annual loss distribution by layer"),
+        shiny::uiOutput("layer_dist_selector"),
+        shiny::plotOutput("layer_loss_dist", height = "360px"))
     )
   })
 
@@ -1052,6 +1055,68 @@ server <- function(input, output, session) {
   output$validation <- shiny::renderTable({
     p <- priced()
     validation_report(p$results, p$burning_cost)
+  })
+
+  # Layer picker for the distribution plot, built from the priced layers so it
+  # stays in step with the Results table even after the contract is edited.
+  output$layer_dist_selector <- shiny::renderUI({
+    r <- priced()$results
+    fmt <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+    labels <- paste0("Layer ", seq_len(nrow(r)), ": ",
+                     fmt(r$cover), " xs ", fmt(r$deductible))
+    shiny::selectInput("dist_layer", "Layer",
+                       choices = stats::setNames(seq_len(nrow(r)), labels),
+                       width = "320px")
+  })
+
+  # Histogram of the simulated annual loss to the chosen layer, with the mean,
+  # VaR and TVaR from the Results table marked on it. Many simulated years have
+  # no loss to a layer, so the share of zero-loss years is annotated, and the
+  # long tail is capped so the bulk of the distribution stays readable.
+  output$layer_loss_dist <- shiny::renderPlot(bg = "#f4f7fc", {
+    p <- priced()
+    n <- length(p$annual_by_layer)
+    i <- as.integer(input$dist_layer)
+    if (length(i) == 0 || is.na(i) || i < 1 || i > n) i <- 1
+    annual <- p$annual_by_layer[[i]]
+    r <- p$results[i, ]
+
+    u <- money_units()
+    xlab_txt <- if (nzchar(u)) paste0("Annual loss to layer (", u, ")") else "Annual loss to layer"
+    fmt <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
+    title <- paste0("Layer ", i, ": ", fmt(r$cover), " xs ", fmt(r$deductible))
+
+    # Cap the view at the TVaR or the 99.5th percentile (whichever is larger);
+    # rarer, larger years are flagged in a note rather than squashing the plot.
+    hi <- max(r$tvar, stats::quantile(annual, 0.995, names = FALSE), na.rm = TRUE)
+    if (!is.finite(hi) || hi <= 0) hi <- max(annual, 1)
+    shown <- annual[annual <= hi]
+    pct0 <- mean(annual == 0) * 100
+    pct_hidden <- mean(annual > hi) * 100
+
+    # Two-pass draw: set the axes, paint the panel white, redraw the bars on top
+    # so only the card tint stays in the margins (matches the other plots).
+    h <- graphics::hist(shown, breaks = 40, plot = FALSE)
+    graphics::plot(h, col = NA, border = NA, xlim = c(0, hi), freq = TRUE,
+                   main = title, xlab = xlab_txt, ylab = "Simulated years")
+    usr <- graphics::par("usr")
+    graphics::rect(usr[1], usr[3], usr[2], usr[4], col = "white", border = NA)
+    graphics::plot(h, col = "#dce6f6", border = "#2f6fd0", add = TRUE)
+    graphics::abline(v = r$expected_loss, col = "#16233f", lwd = 2)
+    graphics::abline(v = r$var, col = "darkorange3", lty = 2, lwd = 2)
+    graphics::abline(v = r$tvar, col = "#b3202a", lty = 2, lwd = 2)
+    graphics::box()
+    legend("topright", c("Mean", "VaR", "TVaR"),
+           col = c("#16233f", "darkorange3", "#b3202a"),
+           lty = c(1, 2, 2), lwd = 2, bty = "n")
+    note <- sprintf("%.0f%% of simulated years: no loss to this layer", pct0)
+    if (pct_hidden >= 0.05) {
+      note <- paste0(note, "\n",
+                     sprintf("%.1f%% of years above %s not shown", pct_hidden, fmt(round(hi))))
+    }
+    graphics::text(usr[1] + 0.03 * (usr[2] - usr[1]),
+                   usr[4] - 0.05 * (usr[4] - usr[3]),
+                   note, adj = c(0, 1), cex = 0.85, col = "#69707c")
   })
 
   output$download <- shiny::downloadHandler(

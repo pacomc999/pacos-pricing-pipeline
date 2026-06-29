@@ -79,7 +79,12 @@ price_models <- function(fits, contract, settings, seed = NULL) {
                         results$deductible[i], results$cover[i])
   }, numeric(1))
   results$oracle_delta <- results$expected_loss - results$oracle
-  list(results = results, sims = sims)
+  # The simulated annual loss to each layer, in results row order, so the
+  # dashboard can plot the empirical loss distribution per layer.
+  annual_by_layer <- lapply(seq_len(nrow(contract)), function(i) {
+    layer_annual_losses(sims, contract[i, ])
+  })
+  list(results = results, sims = sims, annual_by_layer = annual_by_layer)
 }
 
 # End-to-end pricing from a workbook. `overrides` is a named list of modelling

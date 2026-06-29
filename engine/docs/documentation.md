@@ -377,6 +377,14 @@ empirical loss distribution for each layer. From it (`price_layer`):
 - **Tail Value at Risk** $\mathrm{TVaR}_q$, the mean of the losses at or above
   the VaR.
 
+The Price step also plots this empirical distribution per layer: a histogram of
+the simulated annual losses to the selected layer, with the mean, VaR and TVaR
+marked on it (the same values shown in the Results table), and the share of
+simulated years with no loss to the layer annotated. High layers are pierced
+only rarely, so most of their simulated years sit at zero. The per-layer loss
+vectors come from `layer_annual_losses` in `price.R`, the same function
+`price_layer` summarises, so the plot and the headline numbers always agree.
+
 Two premium principles are reported, both driven by user-set loadings:
 
 $$ P_{EV} = (1 + \theta_{EV})\, E[L], \qquad P_{SD} = E[L] + \theta_{SD}\,\mathrm{sd}[L]. $$

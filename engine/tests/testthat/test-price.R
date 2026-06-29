@@ -9,6 +9,21 @@ test_that("annual_layer_loss aggregates per-loss recoveries, AAD and AAL", {
   expect_equal(annual_layer_loss(losses, D = 5, C = 5, aad = 0, aal = 3), 3)
 })
 
+test_that("layer_annual_losses returns one annual loss per simulated year", {
+  # Three hand-built simulated years; layer 5 xs 5, no aggregate controls.
+  sims <- list(c(8, 8), numeric(0), c(12, 3, 7))
+  layer <- data.frame(deductible = 5, cover = 5, aad = 0, aal = 0)
+  annual <- layer_annual_losses(sims, layer)
+  # One value per year, each equal to annual_layer_loss for that year:
+  # 2021: min(8-5,5)*2 = 6; 2022: no losses = 0; 2023: 5 + 0 + 2 = 7.
+  expect_equal(length(annual), length(sims))
+  expect_equal(annual, c(6, 0, 7))
+
+  # Its mean is exactly the expected loss price_layer reports (one source).
+  pp <- list(loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
+  expect_equal(price_layer(sims, layer, pp)$expected_loss, mean(annual))
+})
+
 test_that("price_layer expected loss converges to the validation oracle", {
   # Spliced severity with a real lognormal body; layer 5 xs 5 dips into it.
   set.seed(11)

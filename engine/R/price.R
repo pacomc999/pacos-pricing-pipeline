@@ -11,13 +11,21 @@ annual_layer_loss <- function(year_losses, D, C, aad, aal) {
   agg
 }
 
+# The simulated annual loss to one layer, one value per simulated year. This is
+# the empirical loss distribution for the layer; price_layer summarises it into
+# the headline stats, and the dashboard plots it.
+layer_annual_losses <- function(sims, layer_row) {
+  vapply(sims, function(yl) {
+    annual_layer_loss(yl, layer_row$deductible, layer_row$cover,
+                      layer_row$aad, layer_row$aal)
+  }, numeric(1))
+}
+
 # Prices a single layer from the simulated years.
 price_layer <- function(sims, layer_row, premium_params) {
   D <- layer_row$deductible
   C <- layer_row$cover
-  annual <- vapply(sims, function(yl) {
-    annual_layer_loss(yl, D, C, layer_row$aad, layer_row$aal)
-  }, numeric(1))
+  annual <- layer_annual_losses(sims, layer_row)
 
   expected_loss <- mean(annual)
   sd_loss <- stats::sd(annual)
