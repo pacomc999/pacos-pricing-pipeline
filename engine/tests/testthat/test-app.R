@@ -1,15 +1,39 @@
-# Source app.R to get build_results_table. Sourcing builds the shinyApp object
+# Source app.R to get its helpers (and R/ modules). Sourcing builds the shinyApp object
 # but does not launch a server, so this is safe inside tests.
 source(normalizePath(file.path(getwd(), "..", "..", "app.R")), local = TRUE)
 
-test_that("build_results_table rounds and renames for display", {
+test_that("output_filename describes the run and stays filename-safe", {
+  when <- as.POSIXct("2026-06-29 14:25:30", tz = "UTC")
+  # A single line of business is used as is.
+  expect_equal(output_filename("fire", 2025, when),
+               "Pricing_fire_2025_20260629_142530.xlsx")
+  # Spaces and punctuation are stripped; duplicates collapse to one token.
+  expect_equal(output_filename(c("motor fleet", "motor fleet"), 2024, when),
+               "Pricing_motorfleet_2024_20260629_142530.xlsx")
+  # Many distinct lines collapse to a short token.
+  expect_equal(output_filename(c("a", "b", "c", "d"), 2024, when),
+               "Pricing_multiLOB_2024_20260629_142530.xlsx")
+})
+
+test_that("results_report rounds, renames and puts cover before deductible", {
   priced <- data.frame(deductible = 5, cover = 5, expected_loss = 4.5512,
                        sd_loss = 6.1, var = 20, tvar = 25,
                        premium_ev = 5.006, premium_sd = 5.8,
                        oracle = 4.55, oracle_delta = 0.0012)
-  tbl <- build_results_table(priced)
+  tbl <- results_report(priced)
+  expect_equal(names(tbl)[1:2], c("Cover", "Deductible"))   # cover leads
   expect_true("Expected loss" %in% names(tbl))
-  expect_equal(tbl[["Expected loss"]][1], 4.55)   # rounded to 2 dp
+  expect_equal(tbl[["Expected loss"]][1], 4.55)             # rounded to 2 dp
+})
+
+test_that("validation_report blanks the closed form for aggregate layers", {
+  priced <- data.frame(deductible = 5, cover = 5, expected_loss = 4.5,
+                       oracle = c(NA_real_), oracle_delta = c(NA_real_))
+  bc <- data.frame(bc_advanced = 3.2)
+  tbl <- validation_report(priced, bc)
+  expect_equal(names(tbl)[1:2], c("Cover", "Deductible"))
+  expect_true(is.na(tbl[["Closed form"]][1]))
+  expect_match(tbl$Note[1], "no closed form")
 })
 
 test_that("build_contract_df keeps only the pricing columns in order", {
@@ -42,8 +66,8 @@ test_that("build_structure_plot_data computes tops and labels, dropping bad rows
   expect_equal(nrow(d), 2)
   expect_equal(d$top, c(5, 10))                 # deductible + cover
   expect_equal(d$terms, c("5 xs 0", "5 xs 5"))
-  expect_equal(d$aggregate[1], "AAD none / AAL unlimited")  # blank aggregates
-  expect_equal(d$aggregate[2], "AAD 5 / AAL 20")
+  expect_equal(d$aggregate[1], "AAL unlimited / AAD none")  # blank aggregates
+  expect_equal(d$aggregate[2], "AAL 20 / AAD 5")
 })
 
 test_that("build_structure_plot_data returns empty when no layer has cover", {

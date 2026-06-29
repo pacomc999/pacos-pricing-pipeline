@@ -39,6 +39,39 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
   expect_true(all(abs(res$oracle_delta) / res$oracle < 0.03))
 })
 
+test_that("the closed-form oracle is NA for layers with aggregate conditions", {
+  # Minimal workbook: a handful of fire losses over three years.
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses", data.frame(
+    year = c(2021, 2022, 2023, 2023), loss = c(12, 18, 9.5, 14),
+    line_of_business = "fire"))
+  openxlsx::addWorksheet(wb, "exposure")
+  openxlsx::writeData(wb, "exposure", data.frame(
+    year = 2021:2024, exposure = rep(100, 4)))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2024, inflation = rep(0, 4)))
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
+    key = c("modelling_threshold", "splice_threshold", "frequency_model",
+            "n_simulations", "valuation_year", "loading_ev", "loading_sd",
+            "var_level", "reporting_threshold"),
+    value = c("5", "5", "poisson", "20000", "2024", "0.1", "0.2", "0.99", "2")))
+  openxlsx::saveWorkbook(wb, path)
+
+  # Two identical layers: the first is clean, the second carries an AAL.
+  contract <- data.frame(
+    deductible = c(5, 5), cover = c(10, 10),
+    aad = c(0, 0), aal = c(0, 8))
+
+  res <- run_pricing(path, contract = contract, seed = 7)$results
+  expect_false(is.na(res$oracle[1]))     # clean layer keeps its closed form
+  expect_true(is.na(res$oracle[2]))      # AAL layer has none
+  expect_true(is.na(res$oracle_delta[2]))
+})
+
 test_that("frequency window excludes the prospective valuation year", {
   # 6 losses above mt=5 over 3 observed years (2021-2023) -> lambda = 2.0.
   # Exposure carries 2024 (valuation year) with no losses; it must not dilute.

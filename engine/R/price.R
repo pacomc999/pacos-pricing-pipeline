@@ -28,7 +28,7 @@ price_layer <- function(sims, layer_row, premium_params) {
   premium_sd <- expected_loss + premium_params$loading_sd * sd_loss
 
   data.frame(
-    deductible = D, cover = C,
+    cover = C, deductible = D,
     expected_loss = expected_loss, sd_loss = sd_loss,
     var = var_q, tvar = tvar,
     premium_ev = premium_ev, premium_sd = premium_sd

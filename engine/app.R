@@ -46,9 +46,25 @@ validate_contract <- function(contract) {
   NULL
 }
 
+# Builds a descriptive name for the downloaded workbook, e.g.
+# "Pricing_fire_2025_20260629_142530.xlsx". The line(s) of business and the
+# valuation year describe the run; the timestamp keeps repeat downloads unique.
+# LOB labels are stripped to safe filename characters; a single line is used as
+# is, a few distinct lines are hyphenated, and many collapse to "multiLOB"
+# (pure, unit-tested).
+output_filename <- function(lob, valuation_year, when = Sys.time()) {
+  clean <- gsub("[^A-Za-z0-9]+", "", lob)
+  clean <- unique(clean[nzchar(clean)])
+  lob_part <- if (length(clean) == 0) "all"
+              else if (length(clean) > 3) "multiLOB"
+              else paste(clean, collapse = "-")
+  stamp <- format(when, "%Y%m%d_%H%M%S")
+  paste0("Pricing_", lob_part, "_", valuation_year, "_", stamp, ".xlsx")
+}
+
 # Turns the live contract into per-layer rows for the structure tower plot: each
 # block spans deductible to deductible+cover, with a terms label and a formatted
-# aggregate (AAD/AAL) label. Rows without a positive cover (blank or mid-edit)
+# aggregate (AAL/AAD) label. Rows without a positive cover (blank or mid-edit)
 # are dropped. Pure and unit-tested; the render only draws from this.
 build_structure_plot_data <- function(contract) {
   fmt <- function(x) format(x, big.mark = ",", scientific = FALSE, trim = TRUE)
@@ -67,7 +83,7 @@ build_structure_plot_data <- function(contract) {
     deductible = ct$deductible,
     top = ct$deductible + ct$cover,
     terms = paste0(fmt(ct$cover), " xs ", fmt(ct$deductible)),
-    aggregate = paste0("AAD ", aad_txt, " / AAL ", aal_txt),
+    aggregate = paste0("AAL ", aal_txt, " / AAD ", aad_txt),
     stringsAsFactors = FALSE
   )
 }
@@ -80,20 +96,9 @@ unit_label <- function(currency, units) {
   paste(parts, collapse = " ")
 }
 
-# Formats the priced results for on-screen display (pure, unit-tested).
-build_results_table <- function(priced) {
-  data.frame(
-    Deductible = priced$deductible,
-    Cover = priced$cover,
-    `Expected loss` = round(priced$expected_loss, 2),
-    `Std dev` = round(priced$sd_loss, 2),
-    VaR = round(priced$var, 2),
-    TVaR = round(priced$tvar, 2),
-    `Premium (EV)` = round(priced$premium_ev, 2),
-    `Premium (SD)` = round(priced$premium_sd, 2),
-    check.names = FALSE
-  )
-}
+# The on-screen results and validation tables are formatted by results_report()
+# and validation_report() in R/report.R, so the dashboard and the Excel report
+# always share one definition (same columns, order and names).
 
 # A signature of the inputs that determine a price (data, modelling settings,
 # contract, seed). Two equal signatures mean the same price, so comparing the
@@ -346,24 +351,38 @@ ui <- shiny::fluidPage(
           " defines the reinsurance program to price. Each layer pays a cover",
           " excess of a deductible. Add or remove as many layers as you like;",
           " the structure lives here in the dashboard, not in the workbook."),
+        shiny::tags$p(shiny::tags$strong("Each and every loss (EEL)"),
+          " terms apply to a single loss:"),
         shiny::tags$ul(
-          shiny::tags$li(shiny::tags$strong("Deductible"),
-            ": the loss size where the layer starts paying."),
           shiny::tags$li(shiny::tags$strong("Cover"),
             ": the most the layer pays on a single loss."),
-          shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
-            ": the layer absorbs this much in total over the year before it pays anything. Blank means none."),
+          shiny::tags$li(shiny::tags$strong("Deductible"),
+            ": the loss size where the layer starts paying.")
+        ),
+        shiny::tags$p(shiny::tags$strong("Annual aggregate"),
+          " terms apply across the whole year:"),
+        shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("AAL (annual aggregate limit)"),
-            ": the most the layer pays across the whole year. Blank means unlimited.")
+            ": the most the layer pays across the whole year. Blank means unlimited."),
+          shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
+            ": the layer absorbs this much in total over the year before it pays anything. Blank means none.")
         ),
         shiny::tags$p("A blank aggregate is not the same as 0: blank turns the",
           " control off, while 0 would mean a zero deductible or a zero limit.")
       ),
       shiny::fluidRow(
-        shiny::column(3, shiny::tags$strong("Deductible")),
+        shiny::column(6, shiny::tags$div(shiny::tags$strong("Each and every loss (EEL)"),
+          style = "text-align: center; padding-bottom: 6px; border-bottom: 2px solid #888; margin: 0 12px;")),
+        shiny::column(4, shiny::tags$div(shiny::tags$strong("Annual aggregate"),
+          style = "text-align: center; padding-bottom: 6px; border-bottom: 2px solid #888; margin: 0 12px;")),
+        shiny::column(2, "")
+      ),
+      shiny::fluidRow(
+        style = "margin-top: 6px;",
         shiny::column(3, shiny::tags$strong("Cover")),
-        shiny::column(2, shiny::tags$strong("AAD")),
+        shiny::column(3, shiny::tags$strong("Deductible")),
         shiny::column(2, shiny::tags$strong("AAL")),
+        shiny::column(2, shiny::tags$strong("AAD")),
         shiny::column(2, "")
       ),
       shiny::uiOutput("structure_ui"),
@@ -457,7 +476,10 @@ ui <- shiny::fluidPage(
         ),
         shiny::tags$p("Results show the expected loss, risk measures and two",
           " premiums. Validation compares the simulated expected loss to a",
-          " closed-form figure as a sanity check; small differences are expected."),
+          " closed-form figure as a sanity check; small differences are expected.",
+          " The closed form is a per-loss calculation, so it is blank for layers",
+          " with aggregate conditions (AAD or AAL): those act on the annual",
+          " aggregate and have no closed form, so the simulation is the answer."),
         shiny::tags$p(shiny::tags$strong("Burning cost"),
           " in the validation table is the average annual loss to each layer",
           " measured straight from the history, on an as-if basis: every past",
@@ -574,10 +596,10 @@ server <- function(input, output, session) {
       id <- df$id[i]
       nid <- function(f) paste0("layer_", id, "_", f)
       shiny::fluidRow(
-        shiny::column(3, shiny::numericInput(nid("deductible"), NULL, value = df$deductible[i])),
         shiny::column(3, shiny::numericInput(nid("cover"), NULL, value = df$cover[i])),
-        shiny::column(2, numeric_input_ph(nid("aad"), df$aad[i], "none")),
+        shiny::column(3, shiny::numericInput(nid("deductible"), NULL, value = df$deductible[i])),
         shiny::column(2, numeric_input_ph(nid("aal"), df$aal[i], "unlimited")),
+        shiny::column(2, numeric_input_ph(nid("aad"), df$aad[i], "none")),
         shiny::column(2, shiny::actionButton(paste0("remove_", id), "Remove", class = "btn-danger btn-sm"))
       )
     })
@@ -1000,24 +1022,21 @@ server <- function(input, output, session) {
     )
   })
 
-  output$results <- shiny::renderTable(build_results_table(priced()$results))
+  output$results <- shiny::renderTable(results_report(priced()$results))
 
   output$validation <- shiny::renderTable({
     p <- priced()
-    r <- p$results
-    bc <- p$burning_cost
-    data.frame(Deductible = r$deductible, Cover = r$cover,
-               Simulated = round(r$expected_loss, 3),
-               `Closed form` = round(r$oracle, 3),
-               Delta = round(r$oracle_delta, 4),
-               `Burning cost` = round(bc$bc_advanced, 3), check.names = FALSE)
+    validation_report(p$results, p$burning_cost)
   })
 
   output$download <- shiny::downloadHandler(
-    filename = function() "output.xlsx",
+    filename = function() {
+      d <- input_data()
+      output_filename(d$losses$line_of_business, d$parameters$valuation_year)
+    },
     content = function(file) {
       st <- settings()
-      r <- priced()$results
+      p <- priced()
       gp <- input_data()$parameters
       assumptions <- data.frame(
         key = c("valuation_year", "currency", "amount_units",
@@ -1026,7 +1045,9 @@ server <- function(input, output, session) {
         value = c(gp$valuation_year, gp$currency, gp$amount_units,
                   st$modelling_threshold, st$splice_threshold, st$frequency_model,
                   st$n_simulations, st$loading_ev, st$loading_sd, st$var_level))
-      write_output(file, r, assumptions)
+      # The Excel sheets mirror the dashboard's Results and Validation tables.
+      write_output(file, results_report(p$results), assumptions,
+                   validation = validation_report(p$results, p$burning_cost))
     }
   )
 }

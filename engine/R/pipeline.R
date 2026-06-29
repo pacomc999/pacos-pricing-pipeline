@@ -67,8 +67,14 @@ price_models <- function(fits, contract, settings, seed = NULL) {
              loading_sd = settings$loading_sd,
              var_level = settings$var_level)
   results <- price_program(sims, contract, pp)
-  # Attach the closed-form oracle and the simulation delta.
+  # Attach the closed-form oracle and the simulation delta. The oracle is a
+  # per-loss integral, so it only applies when the layer has no aggregate
+  # conditions. AAD/AAL act on the annual aggregate, which has no closed form,
+  # so those layers get NA and lean on the simulation instead.
   results$oracle <- vapply(seq_len(nrow(results)), function(i) {
+    has_aad <- !is.na(contract$aad[i]) && contract$aad[i] > 0
+    has_aal <- !is.na(contract$aal[i]) && contract$aal[i] > 0
+    if (has_aad || has_aal) return(NA_real_)
     expected_layer_loss(fits$fit_frequency, fits$fit_severity,
                         results$deductible[i], results$cover[i])
   }, numeric(1))
@@ -99,7 +105,9 @@ run_pricing <- function(input_path, overrides = list(),
                 round(fits$fit_severity$pareto$alpha, 4),
                 settings$modelling_threshold, settings$splice_threshold,
                 settings$n_simulations, input$parameters$valuation_year))
-    write_output(output_path, results, assumptions)
+    # The Excel sheets mirror the dashboard's Results and Validation tables.
+    write_output(output_path, results_report(results), assumptions,
+                 validation = validation_report(results, bc))
   }
 
   list(results = results, fit_frequency = fits$fit_frequency,

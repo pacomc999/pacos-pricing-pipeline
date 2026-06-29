@@ -66,11 +66,18 @@ read_input <- function(path) {
        parameters = parameters, inflation = inflation)
 }
 
-# Writes pricing results and the assumptions echo to a two-sheet workbook.
-write_output <- function(path, results, assumptions) {
+# Writes the pricing results, an optional validation table and the assumptions
+# echo to a workbook. The results and validation sheets mirror the dashboard
+# tables (same columns and order); validation is optional for backward
+# compatibility, so callers that only need results can omit it.
+write_output <- function(path, results, assumptions, validation = NULL) {
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "results")
   openxlsx::writeData(wb, "results", results)
+  if (!is.null(validation)) {
+    openxlsx::addWorksheet(wb, "validation")
+    openxlsx::writeData(wb, "validation", validation)
+  }
   openxlsx::addWorksheet(wb, "assumptions")
   openxlsx::writeData(wb, "assumptions", assumptions)
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)

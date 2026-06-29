@@ -400,12 +400,19 @@ $$ E[L_{D,C}] = w \cdot \frac{s^{\alpha}}{1 - \alpha}\left[(D+C)^{1-\alpha} - D^
 
 This validation applies to the per-layer expected loss; the aggregate features
 (AAD and AAL) and the volatility and tail metrics come from the simulation only.
+Because the oracle integrates a single loss, it has no closed form once a layer
+carries an AAD or AAL, so for those layers the oracle is reported as `NA` (blank
+in the dashboard, with a note that the simulation is the answer) rather than a
+misleading per-loss figure.
 
 Alongside the oracle, the Validation table also shows the **burning cost**: the
 average annual loss to each layer taken straight from the history, on an as-if
 basis (every past loss indexed for inflation and corrected for exposure, as if it
-had happened in the valuation year). Unlike the oracle, this carries no model, so
-it is the external sense-check. Where the history is thick the modelled expected
+had happened in the valuation year). Each historical year is layered per loss and
+then run through the layer's annual aggregate deductible and limit, so the
+benchmark reflects the full layer terms (AAD and AAL included), the same way the
+pricer does. Unlike the oracle, this carries no model, so it is the external
+sense-check. Where the history is thick the modelled expected
 loss should sit close to it; for a high layer above the historical experience the
 burning cost reads near zero and the fitted Pareto tail is doing the work, which
 is exactly where a parametric model earns its keep.
