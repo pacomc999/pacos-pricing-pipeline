@@ -1,21 +1,21 @@
 # Builds the input.xlsx template as an openxlsx workbook and returns it, so both
 # the make_example.R script and the dashboard's Generate template button write
-# the exact same file. The template is a richer demo dataset that populates both
-# the lognormal body (losses 5 to 15) and the Pareto tail (losses above 15), so
-# it exercises the full spliced severity. The contract structure is set in the
-# dashboard (not the workbook), so the template has four data sheets: losses,
-# exposure, a per-year inflation sheet, and general inputs.
+# the exact same file. The losses are the experience-pricing example from the
+# Reinsurance Analytics notes (Figure 8): seven losses over 2021 to 2025, with no
+# losses in 2022. The contract structure is set in the dashboard (not the
+# workbook), so the template has four data sheets: losses, exposure, a per-year
+# inflation sheet, and general inputs.
 #
 # The sheets are styled (navy headers matching the dashboard, borders, a frozen
 # header row, inflation as a percentage) so the template reads cleanly in Excel.
 # Styling only affects display; read_input reads the underlying values.
 build_template_workbook <- function() {
   # ---- Data -----------------------------------------------------------------
+  # Experience-pricing example losses (Reinsurance Analytics, Figure 8):
+  # 2021: 12, 9.5 | 2022: none | 2023: 18 | 2024: 13, 7, 11 | 2025: 14.
   losses <- data.frame(
-    year = c(2021, 2021, 2021, 2022, 2022, 2023, 2023, 2023,
-             2024, 2024, 2024, 2024, 2024, 2025, 2025, 2025, 2025),
-    loss = c(6, 8, 22, 7, 35, 9, 11, 18,
-             6, 7, 13, 28, 45, 8, 10, 16, 60),
+    year = c(2021, 2021, 2023, 2024, 2024, 2024, 2025),
+    loss = c(12, 9.5, 18, 13, 7, 11, 14),
     line_of_business = "fire"
   )
   exposure <- data.frame(year = 2021:2026, exposure = c(120, 120, 130, 140, 145, 150))
