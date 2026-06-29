@@ -400,17 +400,6 @@ ui <- shiny::fluidPage(
         shiny::tags$p(shiny::tags$strong("This step"),
           " fits the two ingredients of the price: how often losses happen",
           " (frequency) and how big they are (severity)."),
-        shiny::tags$p("Before either model is fitted, every historical loss is",
-          " trended to the valuation year for loss inflation: each loss is",
-          " multiplied by the inflation since its year, restating old losses in",
-          " today's money. Both the frequency and the severity are fitted on these",
-          " inflation-trended losses, so the price reflects today's loss sizes."),
-        shiny::tags$p("Exposure is handled separately, on the frequency side. The",
-          " expected number of claims is the historical rate scaled to the book",
-          " being priced: the valuation-year exposure relative to the average over",
-          " the observed years. Exposure is a volume measure, so a larger book is",
-          " expected to produce proportionally more claims, not larger ones, and it",
-          " does not change the loss sizes (the severity)."),
         shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("Frequency model"),
             ": how the yearly count of losses is distributed (Poisson, Negative Binomial or Binomial)."),
@@ -434,6 +423,12 @@ ui <- shiny::fluidPage(
       ),
       # Frequency calibration: the model choice and its fitted summary.
       calib_card("Frequency calibration",
+        shiny::tags$p("The yearly counts come from the inflation-trended losses",
+          " above the modelling threshold. The expected number of claims is then",
+          " scaled to the book being priced by exposure: the valuation-year",
+          " exposure relative to the average over the observed years. Exposure is",
+          " a volume measure, so a larger book is expected to produce",
+          " proportionally more claims, not larger ones."),
         shiny::fluidRow(
           shiny::column(4,
             shiny::selectInput("freq", "Frequency model",
@@ -447,6 +442,10 @@ ui <- shiny::fluidPage(
       ),
       # Severity calibration: the splice threshold, the live fit plot, and params.
       calib_card("Severity calibration",
+        shiny::tags$p("The severity is fitted to the losses after trending each",
+          " one to the valuation year for loss inflation, so the fitted sizes are",
+          " in today's money. Exposure does not change the loss sizes; it only",
+          " affects how many claims happen (the frequency)."),
         shiny::fluidRow(
           shiny::column(4,
             shiny::selectInput("sev_model", "Severity model",
