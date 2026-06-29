@@ -55,8 +55,8 @@ step has a collapsible "More information" panel that explains what it does.
 | Step | Name | What you do |
 |------|------|-------------|
 | 1 | Data | Upload the workbook and review the general inputs, losses, exposure and inflation that loaded. |
-| 2 | Model | Choose the modelling threshold, the splice threshold and the frequency model, while live plots show the fit. |
-| 3 | Structure | Define the reinsurance layers (deductible, cover, aggregate deductible, aggregate limit). |
+| 2 | Reinsurance structure | Define the reinsurance layers (deductible, cover, aggregate deductible, aggregate limit). |
+| 3 | Model | Choose the modelling threshold, the splice threshold and the frequency model, while live plots show the fit. |
 | 4 | Price | Set the loadings and the simulation size, run the pricing, and read the results and validation. |
 
 The steps are clickable, so an experienced user can jump back to iterate;

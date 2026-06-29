@@ -302,8 +302,8 @@ ui <- shiny::fluidPage(
       info_panel(
         shiny::tags$p(shiny::tags$strong("What this tool does."),
           " Paco's Pricing Pipeline prices non-proportional reinsurance from a",
-          " historical loss list. You load the data here, choose how to model it,",
-          " define the layers to price, then run a simulation to get a premium."),
+          " historical loss list. You load the data here, define the layers to",
+          " price, choose how to model it, then run a simulation to get a premium."),
         shiny::tags$p(shiny::tags$strong("This step"),
           " loads the pricing template, a ready-made Excel workbook provided",
           " with the tool. You do not build it yourself; you just fill your own",
@@ -336,9 +336,43 @@ ui <- shiny::fluidPage(
           shiny::tags$h4("Exposure & inflation by year"),
           shiny::tags$div(class = "loss-scroll", shiny::tableOutput("year_table")))
       ),
-      step_nav(next_id = "nav_1_next", next_label = "Next: Model")),
+      step_nav(next_id = "nav_1_next", next_label = "Next: Reinsurance structure")),
 
-    # Step 2: choose the modelling thresholds while watching the fit.
+    # Step 2: build the program to price. This comes before modelling so the
+    # lowest deductible is known when the modelling threshold is chosen.
+    shiny::tabPanel("Reinsurance structure", value = "structure",
+      info_panel(
+        shiny::tags$p(shiny::tags$strong("This step"),
+          " defines the reinsurance program to price. Each layer pays a cover",
+          " excess of a deductible. Add or remove as many layers as you like;",
+          " the structure lives here in the dashboard, not in the workbook."),
+        shiny::tags$ul(
+          shiny::tags$li(shiny::tags$strong("Deductible"),
+            ": the loss size where the layer starts paying."),
+          shiny::tags$li(shiny::tags$strong("Cover"),
+            ": the most the layer pays on a single loss."),
+          shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
+            ": the layer absorbs this much in total over the year before it pays anything. Blank means none."),
+          shiny::tags$li(shiny::tags$strong("AAL (annual aggregate limit)"),
+            ": the most the layer pays across the whole year. Blank means unlimited.")
+        ),
+        shiny::tags$p("A blank aggregate is not the same as 0: blank turns the",
+          " control off, while 0 would mean a zero deductible or a zero limit.")
+      ),
+      shiny::fluidRow(
+        shiny::column(3, shiny::tags$strong("Deductible")),
+        shiny::column(3, shiny::tags$strong("Cover")),
+        shiny::column(2, shiny::tags$strong("AAD")),
+        shiny::column(2, shiny::tags$strong("AAL")),
+        shiny::column(2, "")
+      ),
+      shiny::uiOutput("structure_ui"),
+      shiny::actionButton("add_layer", "Add layer"),
+      shiny::tags$h4("Layer structure", style = "margin-top: 26px;"),
+      shiny::plotOutput("structure_plot", height = "360px"),
+      step_nav("nav_2_back", "Back: Data", "nav_2_next", "Next: Model")),
+
+    # Step 3: choose the modelling thresholds while watching the fit.
     shiny::tabPanel("Model", value = "model",
       info_panel(
         shiny::tags$p(shiny::tags$strong("This step"),
@@ -391,46 +425,13 @@ ui <- shiny::fluidPage(
             shiny::conditionalPanel(
               condition = "input.sev_model == 'spliced'",
               shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
-              shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold."))),
+              shiny::helpText("Pick where the tail begins. The plot updates live. Orange dashed line = splice threshold."))),
           shiny::column(8,
             shiny::uiOutput("sev_body_warning"),
             shiny::plotOutput("sev_plot"),
             shiny::tableOutput("sev_params")))
       ),
-      step_nav("nav_2_back", "Back: Data", "nav_2_next", "Next: Structure")),
-
-    # Step 3: build the program to price.
-    shiny::tabPanel("Structure", value = "structure",
-      info_panel(
-        shiny::tags$p(shiny::tags$strong("This step"),
-          " defines the reinsurance program to price. Each layer pays a cover",
-          " excess of a deductible. Add or remove as many layers as you like;",
-          " the structure lives here in the dashboard, not in the workbook."),
-        shiny::tags$ul(
-          shiny::tags$li(shiny::tags$strong("Deductible"),
-            ": the loss size where the layer starts paying."),
-          shiny::tags$li(shiny::tags$strong("Cover"),
-            ": the most the layer pays on a single loss."),
-          shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
-            ": the layer absorbs this much in total over the year before it pays anything. Blank means none."),
-          shiny::tags$li(shiny::tags$strong("AAL (annual aggregate limit)"),
-            ": the most the layer pays across the whole year. Blank means unlimited.")
-        ),
-        shiny::tags$p("A blank aggregate is not the same as 0: blank turns the",
-          " control off, while 0 would mean a zero deductible or a zero limit.")
-      ),
-      shiny::fluidRow(
-        shiny::column(3, shiny::tags$strong("Deductible")),
-        shiny::column(3, shiny::tags$strong("Cover")),
-        shiny::column(2, shiny::tags$strong("AAD")),
-        shiny::column(2, shiny::tags$strong("AAL")),
-        shiny::column(2, "")
-      ),
-      shiny::uiOutput("structure_ui"),
-      shiny::actionButton("add_layer", "Add layer"),
-      shiny::tags$h4("Layer structure", style = "margin-top: 26px;"),
-      shiny::plotOutput("structure_plot", height = "360px"),
-      step_nav("nav_3_back", "Back: Model", "nav_3_next", "Next: Price")),
+      step_nav("nav_3_back", "Back: Reinsurance structure", "nav_3_next", "Next: Price")),
 
     # Step 4: set the loadings, run the Monte Carlo, read the price.
     shiny::tabPanel("Price", value = "price",
@@ -482,7 +483,7 @@ ui <- shiny::fluidPage(
         shiny::column(8,
           shiny::uiOutput("results_area"))
       ),
-      step_nav("nav_4_back", "Back: Structure"))
+      step_nav("nav_4_back", "Back: Model"))
   )
 )
 
@@ -502,12 +503,12 @@ server <- function(input, output, session) {
   # The tabs are clickable (free jumping); these Back/Next buttons just move the
   # active step for the linear path. Nothing is gated.
   go_to <- function(step) shiny::updateTabsetPanel(session, "step", selected = step)
-  shiny::observeEvent(input$nav_1_next, go_to("model"))
+  shiny::observeEvent(input$nav_1_next, go_to("structure"))
   shiny::observeEvent(input$nav_2_back, go_to("data"))
-  shiny::observeEvent(input$nav_2_next, go_to("structure"))
-  shiny::observeEvent(input$nav_3_back, go_to("model"))
+  shiny::observeEvent(input$nav_2_next, go_to("model"))
+  shiny::observeEvent(input$nav_3_back, go_to("structure"))
   shiny::observeEvent(input$nav_3_next, go_to("price"))
-  shiny::observeEvent(input$nav_4_back, go_to("structure"))
+  shiny::observeEvent(input$nav_4_back, go_to("model"))
 
   # ---- Editable contract structure ----
   # The dashboard owns the program now (it is no longer in the workbook). Layers
@@ -757,26 +758,26 @@ server <- function(input, output, session) {
     xlab_txt <- if (nzchar(u)) paste0("Loss (", u, ")") else "Loss"
     # Set up the axes only; the curves are drawn after the white panel below.
     plot(xs, 1 - severity_survival(fit, xs), type = "n", ylim = c(0, 1),
-         xlab = xlab_txt, ylab = "CDF (conditional on X > MT)",
-         main = "Fitted vs empirical severity")
+         xlab = xlab_txt, ylab = "CDF", main = "Fitted vs empirical severity")
     # Fill the panel interior white so only the margins keep the card tint.
     usr <- graphics::par("usr")
     graphics::rect(usr[1], usr[3], usr[2], usr[4], col = "white", border = NA)
-    # Draw the curves on top, thick enough that the colours read clearly.
-    graphics::lines(xs, 1 - severity_survival(fit, xs), col = "black", lwd = 2.5)
+    # Draw the curves on top, thick enough that the colours read clearly. Colours
+    # match the frequency plot: blue fitted, grey empirical.
+    graphics::lines(xs, 1 - severity_survival(fit, xs), col = "#2f6fd0", lwd = 2.5)
     graphics::lines(sort(above), stats::ecdf(above)(sort(above)), type = "s",
                     col = "grey50", lwd = 2.5)
     # The splice line and its legend entry only make sense for the spliced model
     # (single Pareto has the splice pinned at the modelling threshold).
     spliced <- fit$s > fit$mt
-    if (spliced) graphics::abline(v = fit$s, col = "blue", lty = 2, lwd = 2)
+    if (spliced) graphics::abline(v = fit$s, col = "darkorange3", lty = 2, lwd = 2)
     graphics::box()
     labels <- c("Fitted", "Empirical")
-    cols   <- c("black", "grey50")
+    cols   <- c("#2f6fd0", "grey50")
     ltys   <- c(1, 1)
     if (spliced) {
       labels <- c(labels, "Splice threshold")
-      cols   <- c(cols, "blue")
+      cols   <- c(cols, "darkorange3")
       ltys   <- c(ltys, 2)
     }
     legend("bottomright", labels, col = cols, lty = ltys, lwd = 2.5, bty = "n")
@@ -846,6 +847,15 @@ server <- function(input, output, session) {
   output$sev_params <- shiny::renderTable({
     f <- fits()
     sev <- f$fit_severity
+    # Single Pareto (splice = MT): only the tail index is meaningful; the
+    # lognormal rows are NA and the weight is always 1, so show just alpha.
+    if (!(sev$s > sev$mt)) {
+      return(data.frame(Quantity = "Pareto alpha",
+                        Value = round(sev$pareto$alpha, 3),
+                        check.names = FALSE))
+    }
+    # Spliced model: tail index, lognormal body, and the body/tail mixture weight.
+    # mu/sigma stay NA if the body is too sparse to fit (warned above the plot).
     mu <- if (is.null(sev$lnorm)) NA else round(sev$lnorm$meanlog, 3)
     sg <- if (is.null(sev$lnorm)) NA else round(sev$lnorm$sdlog, 3)
     data.frame(
