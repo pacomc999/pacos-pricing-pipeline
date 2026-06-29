@@ -260,11 +260,15 @@ amounts are trended for inflation and exposure adjusts the claim count (or, as a
 rate, the denominator), not the size of each loss.
 
 **Burning cost on-levelling.** The empirical burning cost benchmark (below) is
-put on the same forward book by scaling each observed year's layer loss by the
-exposure ratio $E_V / E_y$ (`exposure_factor`). This is again a volume
-adjustment to the year's total layer loss, not a change to individual loss
-sizes. (The dashboard's information panels explain these exposure roles to the
-user.)
+put on the same forward book by scaling each observed year's aggregate of layer
+recoveries by the exposure ratio $E_V / E_y$ (`exposure_factor`). This is again a
+volume adjustment, not a change to individual loss sizes. The scaling is applied
+*before* the annual aggregate deductible and limit, so those caps still bind on
+the on-levelled figure (scaling after the cap could push the result above an
+AAL). The average is taken over the observed years, the same window the frequency
+uses, so a year with no losses counts as a zero rather than being dropped from
+the denominator. (The dashboard's information panels explain these exposure roles
+to the user.)
 
 ## Frequency model
 

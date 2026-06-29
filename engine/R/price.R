@@ -1,8 +1,13 @@
 # Reinsured loss for one simulated year, in this order:
-# per-loss layering -> AAD -> AAL.
-annual_layer_loss <- function(year_losses, D, C, aad, aal) {
+# per-loss layering -> scale -> AAD -> AAL.
+# `scale` multiplies the aggregate of per-loss recoveries before the aggregate
+# conditions apply. It defaults to 1 (the pricer leaves it alone); the burning
+# cost uses it to on-level a year's volume to the book being priced, so the AAD
+# and AAL still cap the scaled aggregate (the cap must come after the scaling,
+# never before, or the limit can be breached).
+annual_layer_loss <- function(year_losses, D, C, aad, aal, scale = 1) {
   per_loss <- apply_layer(year_losses, D, C)
-  agg <- sum(per_loss)
+  agg <- sum(per_loss) * scale
   # Annual aggregate deductible removes the first aad of aggregate loss
   # (a blank/NA or zero aad means no aggregate deductible).
   if (!is.na(aad) && aad > 0) agg <- max(agg - aad, 0)

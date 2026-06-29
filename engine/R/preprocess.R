@@ -57,27 +57,33 @@ index_losses <- function(losses, exposure, inflation, params) {
 # as the pricer (annual_layer_loss in price.R).
 #
 # The advanced figure puts the history on the basis of the book being priced: the
-# losses are already trended for inflation (loss_indexed), and each year's layer
-# loss is then on-levelled to the valuation-year book by the exposure ratio
+# losses are already trended for inflation (loss_indexed), and each year's volume
+# is then on-levelled to the valuation-year book by the exposure ratio
 # (valuation-year exposure / that year's exposure). Exposure is a volume measure,
 # so a year with a smaller book is expected to have produced proportionally fewer
-# claims; scaling the year's layer loss restores it to the forward book. This is
+# claims; scaling the aggregate of recoveries restores it to the forward book.
+# The scaling is applied before the AAD and AAL (via annual_layer_loss's scale
+# argument), so the aggregate conditions still cap the on-levelled figure. This is
 # the frequency (volume) channel, not a change to the loss sizes, matching how the
 # pricer scales the frequency.
 burning_cost <- function(losses_indexed, contract, exposure, valuation_year) {
-  years <- sort(unique(losses_indexed$year))
-  expo_level <- vapply(years, function(y) {
+  # Average over the observed years (the exposure years up to the latest loss
+  # year), the same window the frequency uses, so a year with no losses counts as
+  # a zero rather than being dropped from the denominator (which would overstate
+  # the burning cost).
+  obs_years <- sort(unique(exposure$year[exposure$year <= max(losses_indexed$year)]))
+  expo_level <- vapply(obs_years, function(y) {
     exposure_factor(exposure, y, valuation_year)
   }, numeric(1))
   rows <- lapply(seq_len(nrow(contract)), function(i) {
     D <- contract$deductible[i]; C <- contract$cover[i]
     aad <- contract$aad[i]; aal <- contract$aal[i]
-    simple_by_year <- vapply(seq_along(years), function(j) {
-      annual_layer_loss(losses_indexed$loss[losses_indexed$year == years[j]], D, C, aad, aal)
+    simple_by_year <- vapply(seq_along(obs_years), function(j) {
+      annual_layer_loss(losses_indexed$loss[losses_indexed$year == obs_years[j]], D, C, aad, aal)
     }, numeric(1))
-    adv_by_year <- vapply(seq_along(years), function(j) {
-      annual_layer_loss(losses_indexed$loss_indexed[losses_indexed$year == years[j]],
-                        D, C, aad, aal) * expo_level[j]
+    adv_by_year <- vapply(seq_along(obs_years), function(j) {
+      annual_layer_loss(losses_indexed$loss_indexed[losses_indexed$year == obs_years[j]],
+                        D, C, aad, aal, scale = expo_level[j])
     }, numeric(1))
     data.frame(deductible = D, cover = C,
                bc_simple = mean(simple_by_year),
