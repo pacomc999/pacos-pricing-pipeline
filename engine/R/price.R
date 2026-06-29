@@ -26,12 +26,9 @@ layer_annual_losses <- function(sims, layer_row) {
   }, numeric(1))
 }
 
-# Prices a single layer from the simulated years.
-price_layer <- function(sims, layer_row, premium_params) {
-  D <- layer_row$deductible
-  C <- layer_row$cover
-  annual <- layer_annual_losses(sims, layer_row)
-
+# Summarises one layer's simulated annual losses into the headline stats row:
+# expected loss, volatility, the tail measures and the two premiums.
+summarise_layer_losses <- function(annual, layer_row, premium_params) {
   expected_loss <- mean(annual)
   sd_loss <- stats::sd(annual)
   var_q <- stats::quantile(annual, premium_params$var_level, names = FALSE)
@@ -41,17 +38,28 @@ price_layer <- function(sims, layer_row, premium_params) {
   premium_sd <- expected_loss + premium_params$loading_sd * sd_loss
 
   data.frame(
-    cover = C, deductible = D,
+    cover = layer_row$cover, deductible = layer_row$deductible,
     expected_loss = expected_loss, sd_loss = sd_loss,
     var = var_q, tvar = tvar,
     premium_ev = premium_ev, premium_sd = premium_sd
   )
 }
 
-# Prices every layer in the program.
+# Prices a single layer from the simulated years.
+price_layer <- function(sims, layer_row, premium_params) {
+  summarise_layer_losses(layer_annual_losses(sims, layer_row), layer_row, premium_params)
+}
+
+# Prices every layer in the program. Each layer's annual loss vector is computed
+# once and reused for both the summary row and the returned distribution, so the
+# program is layered over the simulated years a single time. Returns the results
+# table and the per-layer annual loss vectors (the empirical loss distributions).
 price_program <- function(sims, contract, premium_params) {
-  rows <- lapply(seq_len(nrow(contract)), function(i) {
-    price_layer(sims, contract[i, ], premium_params)
+  annual_by_layer <- lapply(seq_len(nrow(contract)), function(i) {
+    layer_annual_losses(sims, contract[i, ])
   })
-  do.call(rbind, rows)
+  results <- do.call(rbind, lapply(seq_len(nrow(contract)), function(i) {
+    summarise_layer_losses(annual_by_layer[[i]], contract[i, ], premium_params)
+  }))
+  list(results = results, annual_by_layer = annual_by_layer)
 }

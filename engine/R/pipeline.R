@@ -66,7 +66,12 @@ price_models <- function(fits, contract, settings, seed = NULL) {
   pp <- list(loading_ev = settings$loading_ev,
              loading_sd = settings$loading_sd,
              var_level = settings$var_level)
-  results <- price_program(sims, contract, pp)
+  # Layer the program over the simulated years once; this gives both the summary
+  # table and the per-layer annual loss vectors (the empirical distributions the
+  # dashboard plots), in matching row order.
+  priced <- price_program(sims, contract, pp)
+  results <- priced$results
+  annual_by_layer <- priced$annual_by_layer
   # Attach the closed-form oracle and the simulation delta. The oracle is a
   # per-loss integral, so it only applies when the layer has no aggregate
   # conditions. AAD/AAL act on the annual aggregate, which has no closed form,
@@ -79,11 +84,6 @@ price_models <- function(fits, contract, settings, seed = NULL) {
                         results$deductible[i], results$cover[i])
   }, numeric(1))
   results$oracle_delta <- results$expected_loss - results$oracle
-  # The simulated annual loss to each layer, in results row order, so the
-  # dashboard can plot the empirical loss distribution per layer.
-  annual_by_layer <- lapply(seq_len(nrow(contract)), function(i) {
-    layer_annual_losses(sims, contract[i, ])
-  })
   list(results = results, sims = sims, annual_by_layer = annual_by_layer)
 }
 
