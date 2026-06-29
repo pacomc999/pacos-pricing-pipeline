@@ -28,14 +28,21 @@ fit_severity <- function(loss_values, mt, s) {
        pareto = list(x0 = s, alpha = fit_pareto_alpha(tail, s)))
 }
 
-# Caution for the dashboard when the lognormal body is fitted on too few losses.
-# Returns NULL when the body is inactive (n_body == 0, e.g. splice = mt, which
-# gives a single Pareto) or when there are enough points (n_body >= n_min);
-# otherwise a message nudging the user back to a single Pareto. n_min defaults to
+# Caution for the dashboard about the lognormal body. The body is only "active"
+# when the splice sits above the modelling threshold; at splice = mt there is no
+# body (a single Pareto) and no warning. When the body is active, warn if its
+# region holds too few losses to fit a lognormal: either none at all (an empty
+# region the user probably did not intend) or fewer than n_min. n_min defaults to
 # 10 (about five losses per lognormal parameter): reinsurance samples are usually
 # too small to support the extra body parameters reliably.
-severity_body_warning <- function(n_body, n_min = 10) {
-  if (n_body == 0 || n_body >= n_min) return(NULL)
+severity_body_warning <- function(n_body, body_active, n_min = 10) {
+  if (!body_active || n_body >= n_min) return(NULL)
+  if (n_body == 0) {
+    return(paste0("The splice threshold is above the modelling threshold but no",
+                  " losses fall between them, so the lognormal body region is",
+                  " empty. Lower the splice threshold to the modelling threshold",
+                  " to use a single Pareto."))
+  }
   paste0("The lognormal body is fitted on only ", n_body,
          if (n_body == 1) " loss" else " losses",
          " - too few for a reliable fit. Lower the splice threshold to the",

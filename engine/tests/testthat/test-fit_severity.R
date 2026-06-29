@@ -14,21 +14,25 @@ test_that("fit_severity splits body and tail at s, conditional on mt", {
   expect_equal(fit$n_body, 6)
 })
 
-test_that("severity_body_warning fires only for a sparse, active body", {
-  # Inactive body (e.g. splice = mt) -> no warning.
-  expect_null(severity_body_warning(0))
-  # Enough points (>= n_min) -> no warning.
-  expect_null(severity_body_warning(10))
-  expect_null(severity_body_warning(25))
-  # Sparse but active body -> a message mentioning the count.
-  w <- severity_body_warning(2)
-  expect_true(is.character(w))
+test_that("severity_body_warning fires for an active, underpopulated body", {
+  # Inactive body (splice = mt): never warns, whatever the count.
+  expect_null(severity_body_warning(0, body_active = FALSE))
+  expect_null(severity_body_warning(3, body_active = FALSE))
+  # Active body with enough points: no warning.
+  expect_null(severity_body_warning(10, body_active = TRUE))
+  expect_null(severity_body_warning(25, body_active = TRUE))
+  # Active but empty region (splice raised over a gap with no losses).
+  w0 <- severity_body_warning(0, body_active = TRUE)
+  expect_true(is.character(w0))
+  expect_match(w0, "empty")
+  # Active but sparse: a message mentioning the count.
+  w <- severity_body_warning(2, body_active = TRUE)
   expect_match(w, "2 losses")
   # A single body loss is reported in the singular.
-  expect_match(severity_body_warning(1), "1 loss")
+  expect_match(severity_body_warning(1, body_active = TRUE), "1 loss")
   # The threshold is tunable.
-  expect_null(severity_body_warning(4, n_min = 4))
-  expect_false(is.null(severity_body_warning(4, n_min = 5)))
+  expect_null(severity_body_warning(4, body_active = TRUE, n_min = 4))
+  expect_false(is.null(severity_body_warning(4, body_active = TRUE, n_min = 5)))
 })
 
 test_that("a splice at a threshold below all losses is a clean single Pareto", {

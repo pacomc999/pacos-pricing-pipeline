@@ -758,8 +758,12 @@ server <- function(input, output, session) {
   # Caution (amber, non-blocking) when the splice is raised so the lognormal body
   # is fitted on too few losses. Empty when the body is inactive (splice = mt) or
   # there is enough data, so the recommended single-Pareto default stays silent.
+  # The body is active only when the splice sits above the modelling threshold;
+  # severity_body_warning stays silent for the single-Pareto default and flags an
+  # empty or underpopulated body region otherwise.
   output$sev_body_warning <- shiny::renderUI({
-    msg <- severity_body_warning(fits()$fit_severity$n_body)
+    sev <- fits()$fit_severity
+    msg <- severity_body_warning(sev$n_body, sev$s > sev$mt)
     if (is.null(msg)) return(NULL)
     shiny::tags$div(class = "stale-banner", msg)
   })
