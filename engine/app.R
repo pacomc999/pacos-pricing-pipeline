@@ -323,7 +323,6 @@ ui <- shiny::fluidPage(
       shiny::fluidRow(
         shiny::column(6,
           shiny::fileInput("file", "Upload the filled-in template (.xlsx)", accept = ".xlsx"),
-          shiny::helpText("Your upload stays loaded across page refreshes."),
           shiny::uiOutput("data_info")),
         shiny::column(6,
           shiny::tags$h4("General inputs"),
@@ -383,8 +382,16 @@ ui <- shiny::fluidPage(
       calib_card("Severity calibration",
         shiny::fluidRow(
           shiny::column(4,
-            shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
-            shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold.")),
+            shiny::selectInput("sev_model", "Severity model",
+                               choices = c("Single Pareto" = "single",
+                                           "Lognormal body + Pareto tail" = "spliced"),
+                               selected = "single"),
+            # The splice threshold only matters for the spliced model; hide it for
+            # the single Pareto (where it is fixed at the modelling threshold).
+            shiny::conditionalPanel(
+              condition = "input.sev_model == 'spliced'",
+              shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
+              shiny::helpText("Pick where the tail begins. The plot updates live. Blue dashed line = splice threshold."))),
           shiny::column(8,
             shiny::uiOutput("sev_body_warning"),
             shiny::plotOutput("sev_plot"),
@@ -639,7 +646,7 @@ server <- function(input, output, session) {
 
   input_data <- shiny::reactive({
     shiny::validate(shiny::need(!is.null(rv$data),
-      "Upload a pricing workbook (.xlsx) to begin."))
+      "Upload the filled-in input data template (.xlsx) to begin."))
     rv$data
   })
 
@@ -701,6 +708,11 @@ server <- function(input, output, session) {
     st <- resolve_settings(input_data()$parameters)
     shiny::updateNumericInput(session, "mt", value = st$modelling_threshold)
     shiny::updateNumericInput(session, "s", value = st$splice_threshold)
+    # Start spliced only if the workbook places the splice above the threshold;
+    # otherwise the single Pareto (the recommended default) is selected.
+    shiny::updateSelectInput(session, "sev_model",
+      selected = if (!is.na(st$splice_threshold) &&
+                     st$splice_threshold > st$modelling_threshold) "spliced" else "single")
     shiny::updateSelectInput(session, "freq", selected = st$frequency_model)
     shiny::updateNumericInput(session, "nsim", value = st$n_simulations)
     shiny::updateNumericInput(session, "load_ev", value = st$loading_ev)
@@ -708,9 +720,12 @@ server <- function(input, output, session) {
     shiny::updateNumericInput(session, "var_level", value = st$var_level)
   })
 
-  # Current modelling settings from the controls.
+  # Current modelling settings from the controls. The single Pareto is just the
+  # spliced model with the splice pinned to the modelling threshold (empty body),
+  # so the backend is unchanged: it only ever receives a splice threshold.
   settings <- shiny::reactive({
-    list(modelling_threshold = input$mt, splice_threshold = input$s,
+    splice <- if (identical(input$sev_model, "spliced")) input$s else input$mt
+    list(modelling_threshold = input$mt, splice_threshold = splice,
          frequency_model = input$freq, n_simulations = input$nsim,
          loading_ev = input$load_ev, loading_sd = input$load_sd,
          var_level = input$var_level)
@@ -719,11 +734,14 @@ server <- function(input, output, session) {
   # Fast fit (no simulation): drives the Fit tab and updates as thresholds change.
   fits <- shiny::reactive({
     inp <- input_data()
-    shiny::validate(
-      shiny::need(!is.na(input$mt), "Set the modelling threshold."),
-      shiny::need(!is.na(input$s), "Set the splice threshold."),
-      shiny::need(input$s >= input$mt, "Splice threshold must be at least the modelling threshold.")
-    )
+    shiny::validate(shiny::need(!is.na(input$mt), "Set the modelling threshold."))
+    # The splice threshold is only needed (and shown) for the spliced model.
+    if (identical(input$sev_model, "spliced")) {
+      shiny::validate(
+        shiny::need(!is.na(input$s), "Set the splice threshold."),
+        shiny::need(input$s >= input$mt, "Splice threshold must be at least the modelling threshold.")
+      )
+    }
     tryCatch(fit_models(inp, settings()),
              error = function(e) shiny::validate(shiny::need(FALSE, conditionMessage(e))))
   })
@@ -748,11 +766,20 @@ server <- function(input, output, session) {
     graphics::lines(xs, 1 - severity_survival(fit, xs), col = "black", lwd = 2.5)
     graphics::lines(sort(above), stats::ecdf(above)(sort(above)), type = "s",
                     col = "grey50", lwd = 2.5)
-    graphics::abline(v = fit$s, col = "blue", lty = 2, lwd = 2)
+    # The splice line and its legend entry only make sense for the spliced model
+    # (single Pareto has the splice pinned at the modelling threshold).
+    spliced <- fit$s > fit$mt
+    if (spliced) graphics::abline(v = fit$s, col = "blue", lty = 2, lwd = 2)
     graphics::box()
-    legend("bottomright", c("Fitted", "Empirical", "Splice threshold"),
-           col = c("black", "grey50", "blue"), lty = c(1, 1, 2),
-           lwd = 2.5, bty = "n")
+    labels <- c("Fitted", "Empirical")
+    cols   <- c("black", "grey50")
+    ltys   <- c(1, 1)
+    if (spliced) {
+      labels <- c(labels, "Splice threshold")
+      cols   <- c(cols, "blue")
+      ltys   <- c(ltys, 2)
+    }
+    legend("bottomright", labels, col = cols, lty = ltys, lwd = 2.5, bty = "n")
   })
 
   # Caution (amber, non-blocking) when the splice is raised so the lognormal body
