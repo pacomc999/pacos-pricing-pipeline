@@ -205,6 +205,12 @@ app_css <- shiny::tags$style(shiny::HTML("
     border-left: 4px solid #d98324; border-radius: 6px; padding: 10px 14px;
     margin-bottom: 16px; color: #7a4f12; font-weight: 600; }
   .results-area.stale { opacity: 0.5; transition: opacity 0.15s ease; }
+  /* Call to action shown in the results column before the first pricing run. */
+  .run-prompt { background: #eef4fc; border: 1px solid var(--accent);
+    border-left: 4px solid var(--accent); border-radius: 6px;
+    padding: 18px 20px; color: var(--navy-mid); }
+  .run-prompt-title { font-weight: 700; font-size: 18px;
+    color: var(--navy-deep); margin-bottom: 6px; }
 
   /* Scrollable data preview: fixed height so the Losses and Exposure tables
      line up top and bottom; the header stays put while scrolling. */
@@ -1035,6 +1041,18 @@ server <- function(input, output, session) {
   # Banner plus a dimmable wrapper around the two result tables. The table
   # outputs below stay unchanged; this just places them inside a fadeable div.
   output$results_area <- shiny::renderUI({
+    # Before the first run there are no results yet, so prompt the user to start
+    # the pricing. An action button's value is 0 until clicked, so this shows on
+    # arrival and is replaced by the results after the first run. (Re-runs are
+    # nudged by the stale banner below instead.)
+    nrun <- input$run
+    if (is.null(nrun) || nrun == 0) {
+      return(shiny::tags$div(class = "run-prompt",
+        shiny::tags$div(class = "run-prompt-title", "Ready to price"),
+        shiny::tags$p("Set the loadings and simulation options on the left, then click ",
+          shiny::tags$strong("Run pricing"),
+          " to simulate the program and calculate the premium.")))
+    }
     stale <- isTRUE(is_stale())
     shiny::tagList(
       if (stale) shiny::tags$div(class = "stale-banner",
