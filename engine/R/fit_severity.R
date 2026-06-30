@@ -40,13 +40,12 @@ severity_body_warning <- function(n_body, body_active, n_min = 10) {
   if (n_body == 0) {
     return(paste0("The splice threshold is above the modelling threshold but no",
                   " losses fall between them, so the lognormal body region is",
-                  " empty. Lower the splice threshold to the modelling threshold",
-                  " to use a single Pareto."))
+                  " empty. Select the Single Pareto severity model instead."))
   }
   paste0("The lognormal body is fitted on only ", n_body,
          if (n_body == 1) " loss" else " losses",
-         " - too few for a reliable fit. Lower the splice threshold to the",
-         " modelling threshold to use a single Pareto.")
+         " - too few for a reliable fit. Select the Single Pareto severity",
+         " model instead.")
 }
 
 # Conditional survival S(t) = P(X > t | X > mt), vectorised over t.
