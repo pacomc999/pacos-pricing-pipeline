@@ -10,8 +10,8 @@ apply_layer <- function(x, D, C) {
 # for both the dashboard and the headless run_pricing path.
 default_contract <- function() {
   data.frame(
-    deductible = c(5, 10, 20),
-    cover      = c(5, 10, 20),
+    deductible = c(10, 20),
+    cover      = c(10, 20),
     # NA (blank in the dashboard) means no aggregate deductible / unlimited
     # aggregate limit. The pricer treats NA and 0 alike (the control is off).
     aad        = NA_real_,
