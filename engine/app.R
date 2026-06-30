@@ -403,12 +403,12 @@ ui <- shiny::fluidPage(
         shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("Frequency model"),
             ": how the yearly count of losses is distributed (Poisson, Negative Binomial or Binomial)."),
-          shiny::tags$li(shiny::tags$strong("Severity"),
-            ": a lognormal body for ordinary losses spliced onto a Pareto tail for the large ones."),
+          shiny::tags$li(shiny::tags$strong("Severity model"),
+            ": how the loss sizes are distributed. Choose a single Pareto (the default), or a lognormal body for ordinary losses spliced onto a Pareto tail for the large ones."),
           shiny::tags$li(shiny::tags$strong("Modelling threshold (MT)"),
             ": the loss size where modelling starts; smaller losses are ignored."),
           shiny::tags$li(shiny::tags$strong("Splice threshold"),
-            ": where the lognormal body hands over to the heavier Pareto tail.")
+            ": where the lognormal body hands over to the heavier Pareto tail. Only the spliced model uses it.")
         ),
         shiny::tags$p("The severity plot updates live as you move the thresholds,",
           " so you can see how well the fitted curve matches the data and choose",
@@ -488,7 +488,8 @@ ui <- shiny::fluidPage(
             ": fixes the random draws so a run is reproducible.")
         ),
         shiny::tags$p("Results show the expected loss, risk measures and two",
-          " premiums. Validation compares the simulated expected loss to a",
+          " premiums, plus the simulated annual loss distribution for each layer.",
+          " Validation compares the simulated expected loss to a",
           " closed-form figure as a sanity check; small differences are expected.",
           " The closed form is a per-loss calculation, so it is blank for layers",
           " with aggregate conditions (AAD or AAL): those act on the annual",
