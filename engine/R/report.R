@@ -19,10 +19,10 @@ results_report <- function(results) {
 
 # The validation table: simulated against closed-form expected loss, their delta,
 # the burning cost benchmark and a note. The closed form is blank (NA) for layers
-# with aggregate conditions, so the note points the reader to the simulation.
+# with aggregate conditions, which the note flags.
 validation_report <- function(results, burning_cost) {
   note <- ifelse(is.na(results$oracle),
-                 "Aggregate conditions: no closed form, use the simulation", "")
+                 "Aggregate conditions: no closed form", "")
   data.frame(
     Cover = results$cover,
     Deductible = results$deductible,
