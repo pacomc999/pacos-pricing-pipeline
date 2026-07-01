@@ -11,8 +11,8 @@ experience-pricing recipe in ../Literature/Reinsurance_Analytics_2026_vFeb.pdf
 folder is kept locally and is not committed (third-party material).
 
 ## Running
-For end users: double-click `start.vbs` in the parent folder (hidden launch) or
-`engine\start.bat` (visible, for troubleshooting). All commands below run from
+For end users: double-click `start.vbs` in the parent folder (no console window) or
+`engine\start.bat` (visible console, for troubleshooting). All commands below run from
 inside this `engine/` folder:
 - Install dependencies once: `Rscript install_deps.R`
 - Run the test suite: `Rscript run_tests.R`

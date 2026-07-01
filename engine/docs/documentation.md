@@ -83,9 +83,9 @@ Back and Next buttons walk the linear path. Nothing is gated.
 ## Installation and first run
 
 For an end user the simplest path is to double-click `start.vbs` in the top
-folder. It launches the tool hidden (no console window) and opens the dashboard
-in the default browser. `engine\start.bat` does the same with a visible console,
-which is useful for troubleshooting.
+folder. It runs with no console window and opens the dashboard in the default
+browser. `engine\start.bat` does the same with a visible console, which is
+useful for troubleshooting.
 
 On first run the launcher calls `install_deps.R`, which installs any missing
 packages and then re-checks them. If a required package cannot be installed (for
@@ -99,7 +99,7 @@ lives in `engine/`.
 
 | Path | Contents |
 |------|----------|
-| `start.vbs` | Hidden launcher (double-click to run). |
+| `start.vbs` | Double-click launcher; runs with no console window. |
 | `input.xlsx` | The example input workbook (styled to match the dashboard). |
 | `README.md` | Short orientation for the repository. |
 | `engine/` | All the code and tests. |
@@ -471,6 +471,9 @@ of business (v1 prices a single book at a time).
 - P. Arbenz, *Reinsurance Analytics*, FS 2026, Section 2.8 (experience pricing).
   This third-party material is kept locally and is not distributed with the
   tool.
+- P. Parodi, *Pricing in General Insurance*, CRC Press, 2014. General background
+  on experience and exposure rating. This third-party material is kept locally
+  and is not distributed with the tool.
 - The design and methodology are documented here; the implementation is in the
   R modules under `engine/R/`, each with a matching test in
   `engine/tests/testthat/`.
