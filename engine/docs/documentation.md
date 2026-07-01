@@ -112,7 +112,14 @@ lives in `engine/`.
 
 ## Ways to run it
 
-All commands below run from inside the `engine/` folder.
+**The everyday way is to just double-click `start.vbs`.** That is all an end
+user needs to do: it installs anything missing on the first run and opens the
+dashboard in the browser (see Installation and first run above).
+`engine\start.bat` does the same with a visible console, for troubleshooting.
+No commands and no R knowledge are required.
+
+The rest of this section is for developers and advanced use only. These commands
+all run from inside the `engine/` folder:
 
 - **Launch the dashboard:** `Rscript -e "shiny::runApp('.')"` (or open `app.R`
   in RStudio and click Run App).
