@@ -323,18 +323,16 @@ ui <- shiny::fluidPage(
           " historical loss list. You load the data here, define the layers to",
           " price, choose how to model it, then run a simulation to get a premium."),
         shiny::tags$p(shiny::tags$strong("This step"),
-          " loads the pricing template, a ready-made Excel workbook. Use the",
+          " loads the input template, a ready-made Excel workbook. Use the",
           " Generate template button below to save a copy, then fill your own",
           " figures into its four sheets:"),
         shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (the year losses are revalued to) and the reporting threshold (the loss size above which the data is complete), both required, plus an optional currency and amount units that label the figures."),
           shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
-          shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year."),
-          shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year.")
+          shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year. This is used to scale the claim frequency to the book being priced."),
+          shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year. The tool revalues each loss to the valuation year using these rates.")
         ),
-        shiny::tags$p("The losses are revalued to the valuation year using the",
-          " inflation rates, and the claim frequency is scaled by how exposure",
-          " changes. The preview below lets you sanity-check what came in.")
+        shiny::tags$p(" The preview below lets you sanity-check what came in.")
       ),
       # Upload control on the left, the workbook's general inputs to its right,
       # so the two preview tables below start at the same height.
@@ -383,8 +381,6 @@ ui <- shiny::fluidPage(
           shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
             ": the layer absorbs this much in total over the year before it pays anything. Blank means none.")
         ),
-        shiny::tags$p("A blank aggregate is not the same as 0: blank turns the",
-          " control off, while 0 would mean a zero deductible or a zero limit.")
       ),
       shiny::fluidRow(
         shiny::column(6, shiny::tags$div(shiny::tags$strong("Each and every loss (EEL)"),
@@ -434,14 +430,14 @@ ui <- shiny::fluidPage(
           shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
           shiny::uiOutput("mt_help"))
       ),
-      # The compound (collective risk) model that the two cards calibrate.
+      # The compound model that the two cards calibrate.
       shiny::tags$p(class = "model-framework",
-        "The price is built from a compound model (the collective risk model):",
+        "The price is built from a compound model:",
         " the total loss in one year is S = X", shiny::tags$sub("1"), " + X",
         shiny::tags$sub("2"), " + ... + X", shiny::tags$sub("N"),
         ", where N is the number of losses (the frequency) and each X",
         shiny::tags$sub("i"), " is a loss size (the severity), drawn",
-        " independently. We fit N and X separately below; the Price step then",
+        " independently. We fit N and X separately below, the Price step then",
         " simulates many years of S and applies the layers."),
       # Frequency calibration: the model choice and its fitted summary.
       calib_card("Frequency calibration",
@@ -469,11 +465,8 @@ ui <- shiny::fluidPage(
       # Severity calibration: the splice threshold, the live fit plot, and params.
       calib_card("Severity calibration",
         shiny::tags$p("The severity is the size of a single loss, X, given that it",
-          " is above the modelling threshold MT. Each loss is first indexed to the",
-          " valuation year for inflation. We use a spliced severity: a lognormal",
-          " body for ordinary losses joined at the splice threshold s to a Pareto",
-          " tail for the large losses, since the tail is what drives the high",
-          " layers."),
+          " is above the modelling threshold MT. Each historical loss is indexed to the",
+          " valuation year for inflation."),
         shiny::fluidRow(
           shiny::column(4,
             shiny::selectInput("sev_model", "Severity model",
@@ -1033,14 +1026,13 @@ server <- function(input, output, session) {
         line(name("Lognormal body + Pareto tail")),
         line("Body, MT < x ≤ s: lognormal(μ, σ) by maximum likelihood,",
              " truncated to (MT, s]."),
-        line("Tail, x > s: Pareto with lower bound x0 = s and",
+        line("Tail, x > s: Pareto with lower bound x",shiny::tags$sub("0")," = s and",
              " α = n / Σ ln(x / s)."),
-        line("Weight w = (number of losses above s) / (number above MT)."))
+        line("Tail Weight w = (number of losses above s) / (number above MT)."))
     } else {
       shiny::tagList(
         line(name("Single Pareto"),
-             " (one heavy tail for all modelled losses; lower bound x0 = MT)"),
-        line("α = n / Σ ln(x / MT), over the n losses above MT."),
+             " (one heavy tail for all modelled losses; lower bound x",shiny::tags$sub("0")," = MT)"),
         line("Survival S(t) = (t / MT)", shiny::tags$sup("−α"), "."))
     }
     shiny::tags$div(class = "model-formula", body)
