@@ -1,6 +1,6 @@
 # Shiny dashboard for the reinsurance pricing pipeline.
 # All numerical work lives in R/; this file wires the UI to the pipeline.
-# The UI is a four-step flow (Data -> Model -> Structure -> Price): each step
+# The UI is a four-step flow (Data -> Structure -> Model -> Price): each step
 # pairs its controls with its own feedback. The steps are clickable, so an
 # expert can jump back to iterate; Back/Next buttons walk the linear path.
 # The Excel workbook holds the data; the modelling choices and the contract

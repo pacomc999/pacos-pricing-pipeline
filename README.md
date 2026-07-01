@@ -77,9 +77,9 @@ column-by-column schema.
 ## Using the dashboard
 A guided, clickable four-step flow, each step with a "More information" panel:
 1. **Data** — upload the workbook and review what loaded.
-2. **Model** — set the modelling and splice thresholds and the frequency model,
+2. **Structure** — build the layer program (a tower diagram updates live).
+3. **Model** — set the modelling and splice thresholds and the frequency model,
    watching the live fit.
-3. **Structure** — build the layer program (a tower diagram updates live).
 4. **Price** — set the loadings and simulations, click **Run pricing**, read the
    results and validation, then **Download results**.
 

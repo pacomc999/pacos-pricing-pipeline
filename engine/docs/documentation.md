@@ -198,6 +198,8 @@ modules; it contains no pricing mathematics of its own.
 | `price.R` | apply the layers, compute premiums and risk metrics |
 | `validate.R` | closed-form and numerical-integration validation oracle |
 | `pipeline.R` | tie the modules together (`fit_models`, `price_models`, `run_pricing`) |
+| `report.R` | shared display formatters, so the dashboard tables and the Excel report match |
+| `template.R` | build the styled `input.xlsx` template (used by the launcher and the Generate template button) |
 | `app.R` | the Shiny dashboard |
 
 Two design points worth noting:
