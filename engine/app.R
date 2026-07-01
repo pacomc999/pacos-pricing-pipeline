@@ -332,7 +332,7 @@ ui <- shiny::fluidPage(
           shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year. This is used to scale the claim frequency to the book being priced."),
           shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year. The tool revalues each loss to the valuation year using these rates.")
         ),
-        shiny::tags$p(" The preview below lets you sanity-check what came in.")
+        shiny::tags$p("The preview below lets you sanity-check what came in.")
       ),
       # Upload control on the left, the workbook's general inputs to its right,
       # so the two preview tables below start at the same height.
@@ -380,7 +380,7 @@ ui <- shiny::fluidPage(
             ": the most the layer pays across the whole year. Blank means unlimited."),
           shiny::tags$li(shiny::tags$strong("AAD (annual aggregate deductible)"),
             ": the layer absorbs this much in total over the year before it pays anything. Blank means none.")
-        ),
+        )
       ),
       shiny::fluidRow(
         shiny::column(6, shiny::tags$div(shiny::tags$strong("Each and every loss (EEL)"),
@@ -437,7 +437,7 @@ ui <- shiny::fluidPage(
         shiny::tags$sub("2"), " + ... + X", shiny::tags$sub("N"),
         ", where N is the number of losses (the frequency) and each X",
         shiny::tags$sub("i"), " is a loss size (the severity), drawn",
-        " independently. We fit N and X separately below, the Price step then",
+        " independently. We fit N and X separately below; the Price step then",
         " simulates many years of S and applies the layers."),
       # Frequency calibration: the model choice and its fitted summary.
       calib_card("Frequency calibration",
