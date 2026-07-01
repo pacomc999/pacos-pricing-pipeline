@@ -472,8 +472,8 @@ of business (v1 prices a single book at a time).
   This third-party material is kept locally and is not distributed with the
   tool.
 - P. Parodi, *Pricing in General Insurance*, CRC Press, 2014. General background
-  on experience and exposure rating. This third-party material is kept locally
-  and is not distributed with the tool.
+  on experience rating. This third-party material is kept locally and is not
+  distributed with the tool.
 - The design and methodology are documented here; the implementation is in the
   R modules under `engine/R/`, each with a matching test in
   `engine/tests/testthat/`.
