@@ -252,6 +252,13 @@ app_css <- shiny::tags$style(shiny::HTML("
                 border-radius: 8px; padding: 18px 20px 8px; margin-bottom: 18px; }
   .calib-card .calib-title { font-weight: 600; color: var(--navy-mid);
                 font-size: 16px; margin: 0 0 14px; }
+  /* Compound-model intro line above the calibration cards. */
+  .model-framework { color: var(--navy-mid); font-size: 14px; line-height: 1.55;
+                margin: 4px 0 16px; }
+  /* Dynamic fitting formula shown under each model selector. */
+  .model-formula { font-size: 13px; color: var(--navy-mid); line-height: 1.55;
+                margin-top: 10px; }
+  .model-formula .mf-name { font-weight: 600; color: var(--navy-deep); }
 "))
 
 # A collapsible 'More information' panel for the top of a step. It starts closed
@@ -427,14 +434,27 @@ ui <- shiny::fluidPage(
           shiny::numericInput("mt", "Modelling threshold (MT)", value = NA),
           shiny::uiOutput("mt_help"))
       ),
+      # The compound (collective risk) model that the two cards calibrate.
+      shiny::tags$p(class = "model-framework",
+        "The price is built from a compound model (the collective risk model):",
+        " the total loss in one year is S = X", shiny::tags$sub("1"), " + X",
+        shiny::tags$sub("2"), " + ... + X", shiny::tags$sub("N"),
+        ", where N is the number of losses (the frequency) and each X",
+        shiny::tags$sub("i"), " is a loss size (the severity), drawn",
+        " independently. We fit N and X separately below; the Price step then",
+        " simulates many years of S and applies the layers."),
       # Frequency calibration: the model choice and its fitted summary.
       calib_card("Frequency calibration",
-        shiny::tags$p("The yearly counts come from the inflation-trended losses",
-          " above the modelling threshold. The expected number of claims is then",
-          " scaled to the book being priced by exposure: the valuation-year",
-          " exposure relative to the average over the observed years. Exposure is",
-          " a volume measure, so a larger book is expected to produce",
-          " proportionally more claims, not larger ones."),
+        shiny::tags$p("The frequency is the number of losses above the modelling",
+          " threshold in a year, N. We fit it by the method of moments from the",
+          " yearly counts, then scale the expected number to the book being priced",
+          " by the exposure factor f = E",
+          shiny::tags$sub("V"), " / mean(E", shiny::tags$sub("obs"), "), where E",
+          shiny::tags$sub("V"), " is the valuation-year exposure and the average",
+          " runs over the observed years (the exposure years up to the latest loss",
+          " year). This is the same as taking the claims-per-exposure rate over the",
+          " observed years and applying it to the forward book, so a larger forward",
+          " book gives proportionally more claims."),
         shiny::fluidRow(
           shiny::column(4,
             shiny::selectInput("freq", "Frequency model",
@@ -448,10 +468,12 @@ ui <- shiny::fluidPage(
       ),
       # Severity calibration: the splice threshold, the live fit plot, and params.
       calib_card("Severity calibration",
-        shiny::tags$p("The severity is fitted to the losses after trending each",
-          " one to the valuation year for loss inflation, so the fitted sizes are",
-          " in today's money. Exposure does not change the loss sizes; it only",
-          " affects how many claims happen (the frequency)."),
+        shiny::tags$p("The severity is the size of a single loss, X, given that it",
+          " is above the modelling threshold MT. Each loss is first indexed to the",
+          " valuation year for inflation. We use a spliced severity: a lognormal",
+          " body for ordinary losses joined at the splice threshold s to a Pareto",
+          " tail for the large losses, since the tail is what drives the high",
+          " layers."),
         shiny::fluidRow(
           shiny::column(4,
             shiny::selectInput("sev_model", "Severity model",
@@ -463,7 +485,8 @@ ui <- shiny::fluidPage(
             shiny::conditionalPanel(
               condition = "input.sev_model == 'spliced'",
               shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
-              shiny::helpText("Pick where the tail begins. The plot updates live. Orange dashed line = splice threshold."))),
+              shiny::helpText("Pick where the tail begins. The plot updates live. Orange dashed line = splice threshold.")),
+            shiny::uiOutput("sev_formula")),
           shiny::column(8,
             shiny::uiOutput("sev_body_warning"),
             shiny::plotOutput("sev_plot"),
@@ -957,13 +980,24 @@ server <- function(input, output, session) {
     fq <- f$fit_frequency
     model_label <- c(poisson = "Poisson", negbin = "Negative Binomial",
                      binomial = "Binomial")[[fq$type]]
-    data.frame(
-      Quantity = c("Model", "Expected claims per year",
-                   "Observed average per year", "Years observed"),
-      Value = c(model_label, format(round(fq$expected, 2)),
-                format(round(mean(f$counts), 2)), as.character(length(f$counts))),
-      check.names = FALSE
-    )
+    quantity <- c("Model", "Expected claims per year",
+                  "Observed average per year", "Years observed")
+    value <- c(model_label, format(round(fq$expected, 2)),
+               format(round(mean(f$counts), 2)), as.character(length(f$counts)))
+    # Distribution-specific fitted parameters. Poisson is fully described by the
+    # expected claims per year above; the others carry extra shape parameters.
+    p <- fq$params
+    if (fq$type == "negbin") {
+      quantity <- c(quantity, "Size parameter (r)", "Implied variance")
+      value <- c(value, format(round(p$size, 3)),
+                 format(round(p$mu + p$mu^2 / p$size, 2)))
+    } else if (fq$type == "binomial") {
+      quantity <- c(quantity, "Number of trials (n)", "Success probability (p)",
+                    "Implied variance")
+      value <- c(value, as.character(p$size), format(round(p$prob, 3)),
+                 format(round(p$size * p$prob * (1 - p$prob), 2)))
+    }
+    data.frame(Quantity = quantity, Value = value, check.names = FALSE)
   })
 
   output$sev_params <- shiny::renderTable({
@@ -987,6 +1021,29 @@ server <- function(input, output, session) {
                 mu, sg, round(sev$weight, 3)),
       check.names = FALSE
     )
+  })
+
+  # Structural formula for the severity model currently chosen. It depends only
+  # on the selector, so it shows even before any data is loaded.
+  output$sev_formula <- shiny::renderUI({
+    name <- function(x) shiny::tags$span(class = "mf-name", x)
+    line <- function(...) shiny::tags$div(...)
+    body <- if (identical(input$sev_model, "spliced")) {
+      shiny::tagList(
+        line(name("Lognormal body + Pareto tail")),
+        line("Body, MT < x ≤ s: lognormal(μ, σ) by maximum likelihood,",
+             " truncated to (MT, s]."),
+        line("Tail, x > s: Pareto with lower bound x0 = s and",
+             " α = n / Σ ln(x / s)."),
+        line("Weight w = (number of losses above s) / (number above MT)."))
+    } else {
+      shiny::tagList(
+        line(name("Single Pareto"),
+             " (one heavy tail for all modelled losses; lower bound x0 = MT)"),
+        line("α = n / Σ ln(x / MT), over the n losses above MT."),
+        line("Survival S(t) = (t / MT)", shiny::tags$sup("−α"), "."))
+    }
+    shiny::tags$div(class = "model-formula", body)
   })
 
   # Pricing runs only on demand (the expensive Monte Carlo step).
