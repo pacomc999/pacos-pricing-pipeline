@@ -11,6 +11,20 @@ if (file.exists("CRAN_MIRROR.txt")) {
   if (!is.na(mirror) && nzchar(mirror)) options(repos = c(CRAN = mirror))
 }
 
+# Make sure there is a library we are allowed to write to. R is often installed
+# under Program Files, whose library needs administrator rights, so a normal
+# user cannot write there. R would normally fall back to a personal library, but
+# it only offers that interactively; running non-interactively (as the launcher
+# does) the install just fails with a "library is not writable" warning. So we
+# create the personal library ourselves and put it first on the search path,
+# which needs no admin rights. Later R sessions (the app) pick it up
+# automatically once the folder exists.
+user_lib <- strsplit(Sys.getenv("R_LIBS_USER"), .Platform$path.sep)[[1]][1]
+if (!is.na(user_lib) && nzchar(user_lib)) {
+  if (!dir.exists(user_lib)) dir.create(user_lib, recursive = TRUE)
+  .libPaths(c(user_lib, .libPaths()))
+}
+
 # Packages the dashboard needs to run (later ships with shiny and is used for
 # the self-shutdown timer). testthat is only for the test suite, so it is
 # installed if possible but never blocks the app.
