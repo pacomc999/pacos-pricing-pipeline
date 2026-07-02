@@ -101,6 +101,36 @@ test_that("frequency window excludes the prospective valuation year", {
   expect_equal(res$fit_frequency$expected, 2.0)   # 6/3, not 6/4
 })
 
+test_that("a declared last complete year keeps trailing zero-loss years", {
+  # Same 6 losses over 2021-2023, but 2024 is declared complete with no losses:
+  # the window becomes 4 years and lambda = 6/4 = 1.5, not 6/3 = 2.0. Without
+  # the declaration the window would end at the latest loss year, dropping a
+  # genuine zero year and overstating the frequency.
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses", data.frame(
+    year = c(2021, 2021, 2022, 2023, 2023, 2023),
+    loss = c(8, 9, 10, 7, 11, 13), line_of_business = "fire"))
+  openxlsx::addWorksheet(wb, "exposure")
+  openxlsx::writeData(wb, "exposure", data.frame(
+    year = 2021:2025, exposure = rep(100, 5)))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2025, inflation = rep(0, 5)))
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
+    key = c("modelling_threshold", "splice_threshold", "frequency_model",
+            "n_simulations", "valuation_year", "loading_ev", "loading_sd",
+            "var_level", "reporting_threshold", "last_complete_year"),
+    value = c("5", "5", "poisson", "1000", "2025",
+              "0.1", "0.2", "0.99", "2", "2024")))
+  openxlsx::saveWorkbook(wb, path)
+
+  res <- run_pricing(path, seed = 1)
+  expect_equal(res$fit_frequency$expected, 1.5)   # 6/4, not 6/3
+})
+
 test_that("a growing book scales the projected frequency by exposure", {
   # Same 6 losses over 3 observed years (lambda 2.0), but the prospective book
   # (2024) is twice the observed average, so the expected frequency doubles.

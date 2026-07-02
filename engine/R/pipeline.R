@@ -38,10 +38,11 @@ resolve_settings <- function(parameters, overrides = list()) {
 # Carlo), so the dashboard can call it live as the thresholds change.
 fit_models <- function(input, settings) {
   losses <- index_losses(input$losses, input$exposure, input$inflation, input$parameters)
-  # Observation window: exposure years up to the latest loss year only (the
-  # prospective valuation year carries exposure but no losses).
-  obs_years <- input$exposure$year[input$exposure$year <= max(input$losses$year)]
-  years <- sort(unique(obs_years))
+  # Observation window: exposure years up to the declared last complete year
+  # (falling back to the latest loss year). The prospective valuation year
+  # carries exposure but no losses, so it never enters the window.
+  years <- observation_years(input$exposure, input$losses,
+                             input$parameters$last_complete_year)
   # The data is only complete above the reporting threshold in each loss year's
   # own money, so the counts (taken on indexed losses) are only complete above
   # the indexed reporting threshold. The dashboard clamps MT to that floor; the
@@ -112,7 +113,9 @@ run_pricing <- function(input_path, overrides = list(),
   fits <- fit_models(input, settings)
   priced <- price_models(fits, contract, settings, seed)
   results <- priced$results
-  bc <- burning_cost(fits$losses, contract, input$exposure, input$parameters$valuation_year)
+  bc <- burning_cost(fits$losses, contract, input$exposure,
+                     input$parameters$valuation_year,
+                     input$parameters$last_complete_year)
 
   if (!is.null(output_path)) {
     assumptions <- data.frame(

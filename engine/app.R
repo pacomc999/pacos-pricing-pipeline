@@ -327,7 +327,7 @@ ui <- shiny::fluidPage(
           " Generate template button below to save a copy, then fill your own",
           " figures into its four sheets:"),
         shiny::tags$ul(
-          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (the year losses are revalued to) and the reporting threshold (the loss size above which the data is complete), both required, plus an optional currency and amount units that label the figures."),
+          shiny::tags$li(shiny::tags$strong("general inputs"), ": the valuation year (the year losses are revalued to) and the reporting threshold (the loss size above which the data is complete), both required, plus optional fields: the last complete year (the last year with complete loss data, so a final year with no losses still counts), and a currency and amount units that label the figures."),
           shiny::tags$li(shiny::tags$strong("losses"), ": one row per claim (year and loss amount)."),
           shiny::tags$li(shiny::tags$strong("exposure"), ": a measure of how much business was written each year. This is used to scale the claim frequency to the book being priced."),
           shiny::tags$li(shiny::tags$strong("inflation"), ": the loss inflation rate for each year. The tool revalues each loss to the valuation year using these rates.")
@@ -680,7 +680,7 @@ server <- function(input, output, session) {
     d <- rv$data
     rt <- d$parameters$reporting_threshold
     if (is.null(rt)) return(NA_real_)
-    yrs <- sort(unique(d$exposure$year[d$exposure$year <= max(d$losses$year)]))
+    yrs <- observation_years(d$exposure, d$losses, d$parameters$last_complete_year)
     indexed_reporting_threshold(rt, d$inflation, yrs, d$parameters$valuation_year)
   })
 
@@ -788,9 +788,9 @@ server <- function(input, output, session) {
     }
     data.frame(
       Parameter = c("Valuation year", "Reporting threshold",
-                    "Currency", "Amount units"),
+                    "Last complete year", "Currency", "Amount units"),
       Value = c(as.character(p$valuation_year), as.character(p$reporting_threshold),
-                shown(p$currency), shown(p$amount_units)),
+                shown(p$last_complete_year), shown(p$currency), shown(p$amount_units)),
       check.names = FALSE
     )
   })
@@ -1065,7 +1065,8 @@ server <- function(input, output, session) {
       # on an as-if basis (losses trended for inflation, then on-levelled to the
       # valuation-year book by exposure), in layer order.
       out$burning_cost <- burning_cost(f$losses, ct, inp$exposure,
-                                       inp$parameters$valuation_year)
+                                       inp$parameters$valuation_year,
+                                       inp$parameters$last_complete_year)
       out
     })
   })

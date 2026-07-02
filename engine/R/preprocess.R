@@ -36,6 +36,21 @@ inflation_factor <- function(inflation, loss_year, valuation_year) {
   if (valuation_year < loss_year) 1 / factor else factor
 }
 
+# The observed experience years: the exposure years up to the last complete
+# experience year. When the user does not declare one, it falls back to the
+# latest loss year, but that year is itself random: a genuine zero-loss final
+# year would be dropped (overstating frequency), and a partially observed final
+# year would be counted in full (understating it). Declaring the last complete
+# year in the workbook fixes both.
+observation_years <- function(exposure, losses, last_complete_year = NA) {
+  end <- if (is.null(last_complete_year) || is.na(last_complete_year)) {
+    max(losses$year)
+  } else {
+    last_complete_year
+  }
+  sort(unique(exposure$year[exposure$year <= end]))
+}
+
 # The completeness floor for the modelling threshold, in valuation-year money.
 # The reporting threshold guarantees complete data in each loss year's OWN
 # money. Once losses are indexed, that guarantee only holds above the threshold
@@ -83,12 +98,12 @@ index_losses <- function(losses, exposure, inflation, params) {
 # argument), so the aggregate conditions still cap the on-levelled figure. This is
 # the frequency (volume) channel, not a change to the loss sizes, matching how the
 # pricer scales the frequency.
-burning_cost <- function(losses_indexed, contract, exposure, valuation_year) {
-  # Average over the observed years (the exposure years up to the latest loss
-  # year), the same window the frequency uses, so a year with no losses counts as
-  # a zero rather than being dropped from the denominator (which would overstate
-  # the burning cost).
-  obs_years <- sort(unique(exposure$year[exposure$year <= max(losses_indexed$year)]))
+burning_cost <- function(losses_indexed, contract, exposure, valuation_year,
+                         last_complete_year = NA) {
+  # Average over the observed years, the same window the frequency uses, so a
+  # year with no losses counts as a zero rather than being dropped from the
+  # denominator (which would overstate the burning cost).
+  obs_years <- observation_years(exposure, losses_indexed, last_complete_year)
   expo_level <- vapply(obs_years, function(y) {
     exposure_factor(exposure, y, valuation_year)
   }, numeric(1))

@@ -78,6 +78,21 @@ test_that("read_input accepts a workbook with only the required general inputs",
   expect_true(is.na(input$parameters$amount_units))
 })
 
+test_that("read_input parses the optional last complete year", {
+  # Absent: NA (the pipeline falls back to the latest loss year).
+  path <- write_tmp_workbook()
+  expect_true(is.na(read_input(path)$parameters$last_complete_year))
+  # Present: read as an integer year.
+  wb <- openxlsx::loadWorkbook(path)
+  openxlsx::removeWorksheet(wb, "general inputs")
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
+    key = c("valuation_year", "reporting_threshold", "last_complete_year"),
+    value = c("2026", "2", "2024")))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  expect_equal(read_input(path)$parameters$last_complete_year, 2024L)
+})
+
 test_that("read_input errors when the required reporting threshold is missing", {
   path <- write_tmp_workbook()
   wb <- openxlsx::loadWorkbook(path)

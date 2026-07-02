@@ -47,6 +47,10 @@ read_input <- function(path) {
     reporting_threshold = num("reporting_threshold"),
     currency            = opt_chr("currency"),
     amount_units        = opt_chr("amount_units"),
+    # The last year with complete loss data (optional). It ends the frequency
+    # and burning cost observation window; when absent, the latest loss year is
+    # used instead.
+    last_complete_year  = opt_int("last_complete_year"),
     modelling_threshold = opt_num("modelling_threshold"),
     splice_threshold    = opt_num("splice_threshold"),
     frequency_model     = opt_chr("frequency_model"),

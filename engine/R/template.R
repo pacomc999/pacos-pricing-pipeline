@@ -28,10 +28,12 @@ build_template_workbook <- function() {
   # reporting threshold are required; currency and amount units are optional. The
   # notes column documents this in the sheet; read_input ignores extra columns.
   parameters <- data.frame(
-    key   = c("valuation_year", "reporting_threshold", "currency", "amount_units"),
-    value = c("2026", "2", "EUR", "millions"),
+    key   = c("valuation_year", "reporting_threshold", "last_complete_year",
+              "currency", "amount_units"),
+    value = c("2026", "2", "2025", "EUR", "millions"),
     notes = c("Required: the year losses are revalued to.",
               "Required: the loss size above which the data is complete.",
+              "Optional: the last year with complete loss data. Defaults to the latest loss year.",
               "Optional: shown next to amounts.",
               "Optional: shown next to amounts (e.g. millions, thousands)."))
 

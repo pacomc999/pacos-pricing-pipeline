@@ -86,6 +86,30 @@ test_that("index_losses trends losses for inflation only, not exposure", {
   expect_equal(round(out$loss_indexed[1], 2), 13.25)
 })
 
+test_that("observation_years defaults to the latest loss year and honours the override", {
+  exposure <- data.frame(year = 2021:2026, exposure = rep(100, 6))
+  losses <- data.frame(year = c(2021, 2023), loss = c(10, 20))
+  # Default window: exposure years up to the latest loss year.
+  expect_equal(observation_years(exposure, losses), 2021:2023)
+  # An explicit last complete year keeps a trailing zero-loss year in the window.
+  expect_equal(observation_years(exposure, losses, 2025), 2021:2025)
+  # NA means not set: same as the default.
+  expect_equal(observation_years(exposure, losses, NA), 2021:2023)
+})
+
+test_that("burning_cost honours the last complete year in its denominator", {
+  losses <- data.frame(year = c(2021, 2023), loss = c(10, 20))
+  losses$loss_indexed <- losses$loss
+  exposure <- data.frame(year = 2021:2025, exposure = rep(100, 5))
+  ct <- data.frame(deductible = 0, cover = 100, aad = 0, aal = 0)
+  # Default window 2021:2023: (10 + 0 + 20) / 3 = 10.
+  expect_equal(burning_cost(losses, ct, exposure, 2025)$bc_advanced, 10)
+  # Declaring 2024 complete adds a genuine zero year: (10 + 0 + 20 + 0) / 4.
+  expect_equal(
+    burning_cost(losses, ct, exposure, 2025, last_complete_year = 2024)$bc_advanced,
+    7.5)
+})
+
 test_that("indexed_reporting_threshold compounds the completeness floor", {
   # Zero inflation: indexing changes nothing, the floor is the nominal threshold.
   flat <- data.frame(year = 2021:2026, inflation = rep(0, 6))
