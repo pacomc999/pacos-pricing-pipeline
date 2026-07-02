@@ -14,8 +14,10 @@ write_tmp_workbook <- function() {
     exposure = c(120, 120, 130, 140, 145)
   ))
   openxlsx::addWorksheet(wb, "inflation")
+  # Runs through the valuation year (2026): revaluing a 2025 loss to 2026
+  # money needs the 2026 rate, and read_input checks that coverage.
   openxlsx::writeData(wb, "inflation", data.frame(
-    year = 2021:2025, inflation = c(0.02, 0.03, 0.025, 0.04, 0.03)
+    year = 2021:2026, inflation = c(0.02, 0.03, 0.025, 0.04, 0.03, 0.035)
   ))
   openxlsx::addWorksheet(wb, "general inputs")
   openxlsx::writeData(wb, "general inputs", data.frame(
@@ -51,7 +53,7 @@ test_that("read_input parses all four sheets with correct types", {
 
   # Inflation is a per-year table now, not a single parameter.
   expect_null(input$parameters$loss_inflation_pa)
-  expect_equal(nrow(input$inflation), 5)
+  expect_equal(nrow(input$inflation), 6)
   expect_equal(input$inflation$inflation[2], 0.03)
 
   # The contract no longer lives in the workbook; the dashboard owns it.
@@ -116,6 +118,75 @@ test_that("read_input errors clearly on a missing required parameter", {
   # The message must name the sheet as it appears in the workbook, so the user
   # can find it: the sheet is called 'general inputs', not 'parameters'.
   expect_error(read_input(path), "general inputs")
+})
+
+# Helper that replaces one sheet of an existing workbook with new data.
+replace_sheet <- function(path, sheet, df) {
+  wb <- openxlsx::loadWorkbook(path)
+  openxlsx::removeWorksheet(wb, sheet)
+  openxlsx::addWorksheet(wb, sheet)
+  openxlsx::writeData(wb, sheet, df)
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  path
+}
+
+test_that("read_input rejects missing or non-positive loss data", {
+  # A missing loss amount.
+  path <- replace_sheet(write_tmp_workbook(), "losses", data.frame(
+    year = c(2021, 2022), loss = c(12, NA), line_of_business = "fire"))
+  expect_error(read_input(path), "losses")
+  # A zero loss.
+  path <- replace_sheet(write_tmp_workbook(), "losses", data.frame(
+    year = c(2021, 2022), loss = c(12, 0), line_of_business = "fire"))
+  expect_error(read_input(path), "positive")
+  # A missing loss year.
+  path <- replace_sheet(write_tmp_workbook(), "losses", data.frame(
+    year = c(2021, NA), loss = c(12, 9), line_of_business = "fire"))
+  expect_error(read_input(path), "losses")
+})
+
+test_that("read_input rejects duplicate or broken exposure and inflation years", {
+  # The same exposure year twice would break the per-year lookups downstream.
+  path <- replace_sheet(write_tmp_workbook(), "exposure", data.frame(
+    year = c(2021, 2021, 2022, 2023, 2024, 2025),
+    exposure = c(120, 120, 120, 130, 140, 145)))
+  expect_error(read_input(path), "exposure.*twice|twice.*exposure")
+  # A non-positive exposure breaks the on-levelling ratios.
+  path <- replace_sheet(write_tmp_workbook(), "exposure", data.frame(
+    year = 2021:2025, exposure = c(120, 0, 130, 140, 145)))
+  expect_error(read_input(path), "exposure")
+  # Duplicate inflation years.
+  path <- replace_sheet(write_tmp_workbook(), "inflation", data.frame(
+    year = c(2021, 2021, 2022, 2023, 2024, 2025),
+    inflation = c(0.02, 0.02, 0.03, 0.025, 0.04, 0.03)))
+  expect_error(read_input(path), "inflation.*twice|twice.*inflation")
+})
+
+test_that("read_input rejects loss years absent from the exposure sheet", {
+  # A 2020 loss with no 2020 exposure row: the year would silently drop out of
+  # the frequency window while its loss still entered the severity fit.
+  path <- replace_sheet(write_tmp_workbook(), "losses", data.frame(
+    year = c(2020, 2021), loss = c(12, 9), line_of_business = "fire"))
+  expect_error(read_input(path), "exposure")
+})
+
+test_that("read_input rejects inflation that does not cover the indexation span", {
+  # Losses from 2021 revalued to 2026 need the 2022 to 2026 rates; drop 2025.
+  path <- replace_sheet(write_tmp_workbook(), "inflation", data.frame(
+    year = c(2021, 2022, 2023, 2024), inflation = c(0.02, 0.03, 0.025, 0.04)))
+  expect_error(read_input(path), "inflation")
+})
+
+test_that("read_input warns about losses at or below the reporting threshold", {
+  # A loss of 1.5 sits below the reporting threshold of 2: the data is declared
+  # complete only above 2, so this is suspicious but not fatal.
+  path <- replace_sheet(write_tmp_workbook(), "losses", data.frame(
+    year = c(2021, 2022), loss = c(1.5, 12), line_of_business = "fire"))
+  input <- read_input(path)
+  expect_true(length(input$warnings) == 1)
+  expect_match(input$warnings, "reporting threshold")
+  # A clean workbook carries no warnings.
+  expect_equal(length(read_input(write_tmp_workbook())$warnings), 0)
 })
 
 test_that("read_input errors clearly when a required sheet is missing", {

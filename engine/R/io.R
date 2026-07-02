@@ -66,8 +66,86 @@ read_input <- function(path) {
   inflation$year <- as.integer(inflation$year)
   inflation$inflation <- as.numeric(inflation$inflation)
 
+  warnings <- validate_input(losses, exposure, inflation, parameters)
+
   list(losses = losses, exposure = exposure,
-       parameters = parameters, inflation = inflation)
+       parameters = parameters, inflation = inflation, warnings = warnings)
+}
+
+# Checks the parsed workbook data. Problems the pipeline cannot price safely
+# stop with a plain message naming the sheet to fix; soft problems come back as
+# a character vector of warnings that the Data step shows next to the preview.
+validate_input <- function(losses, exposure, inflation, parameters) {
+  problems <- character(0)
+  # Losses: every row needs a year and a positive amount.
+  if (any(is.na(losses$year)) || any(is.na(losses$loss))) {
+    problems <- c(problems,
+      "The 'losses' sheet has rows with a missing year or loss amount.")
+  }
+  if (any(!is.na(losses$loss) & losses$loss <= 0)) {
+    problems <- c(problems, paste0(
+      "The 'losses' sheet has loss amounts of 0 or less;",
+      " every loss must be a positive amount."))
+  }
+  # Exposure: one positive value per year, no repeats (duplicate years would
+  # break the per-year lookups in the on-levelling).
+  if (any(is.na(exposure$year)) || any(is.na(exposure$exposure))) {
+    problems <- c(problems,
+      "The 'exposure' sheet has rows with a missing year or exposure.")
+  }
+  if (anyDuplicated(stats::na.omit(exposure$year)) > 0) {
+    problems <- c(problems, "The 'exposure' sheet lists the same year twice.")
+  }
+  if (any(!is.na(exposure$exposure) & exposure$exposure <= 0)) {
+    problems <- c(problems, paste0(
+      "The 'exposure' sheet has exposures of 0 or less;",
+      " every year needs a positive exposure."))
+  }
+  # Inflation: one rate per year, no repeats.
+  if (any(is.na(inflation$year)) || any(is.na(inflation$inflation))) {
+    problems <- c(problems,
+      "The 'inflation' sheet has rows with a missing year or rate.")
+  }
+  if (anyDuplicated(stats::na.omit(inflation$year)) > 0) {
+    problems <- c(problems, "The 'inflation' sheet lists the same year twice.")
+  }
+  # Every loss year needs an exposure row, or the year silently drops out of
+  # the frequency window while its losses still enter the severity fit.
+  missing_expo <- setdiff(losses$year[!is.na(losses$year)], exposure$year)
+  if (length(missing_expo) > 0) {
+    problems <- c(problems, paste0(
+      "Loss year(s) ", paste(missing_expo, collapse = ", "),
+      " have no row in the 'exposure' sheet."))
+  }
+  # Indexation needs a rate for every year between the oldest loss (plus one)
+  # and the valuation year, in either direction.
+  yrs <- c(losses$year[!is.na(losses$year)], parameters$valuation_year)
+  lo <- min(yrs); hi <- max(yrs)
+  if (hi > lo) {
+    missing_infl <- setdiff((lo + 1):hi, inflation$year)
+    if (length(missing_infl) > 0) {
+      problems <- c(problems, paste0(
+        "The 'inflation' sheet is missing the rate for year(s) ",
+        paste(missing_infl, collapse = ", "),
+        ", needed to revalue the losses to the valuation year."))
+    }
+  }
+  if (length(problems) > 0) {
+    stop("The input workbook has problems:\n- ",
+         paste(problems, collapse = "\n- "), call. = FALSE)
+  }
+  # Soft checks: suspicious but priceable, so they warn instead of stopping.
+  warnings <- character(0)
+  n_below <- sum(!is.na(losses$loss) &
+                 losses$loss <= parameters$reporting_threshold)
+  if (n_below > 0) {
+    warnings <- c(warnings, paste0(
+      n_below, if (n_below == 1) " loss sits" else " losses sit",
+      " at or below the reporting threshold (", parameters$reporting_threshold,
+      "). The data is declared complete only above that size, so check the",
+      " threshold or the loss list."))
+  }
+  warnings
 }
 
 # Writes the pricing results, an optional validation table and the assumptions

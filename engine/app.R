@@ -752,12 +752,18 @@ server <- function(input, output, session) {
   })
 
   # ---- Step 1 data preview ----
-  # A short confirmation of what loaded: filename, loss count, and year range.
+  # A short confirmation of what loaded (filename, loss count, year range),
+  # plus any soft data warnings read_input attached (amber, non-blocking).
   output$data_info <- shiny::renderUI({
     d <- input_data()
     yrs <- range(d$losses$year)
-    shiny::tags$p(shiny::tags$strong(rv$name), sprintf(
-      " loaded: %d losses across %d-%d.", nrow(d$losses), yrs[1], yrs[2]))
+    shiny::tagList(
+      shiny::tags$p(shiny::tags$strong(rv$name), sprintf(
+        " loaded: %d losses across %d-%d.", nrow(d$losses), yrs[1], yrs[2])),
+      if (length(d$warnings) > 0)
+        shiny::tags$div(class = "stale-banner",
+                        lapply(d$warnings, shiny::tags$div))
+    )
   })
 
   # The full loss list, so the user can sanity-check every claim. The table sits
