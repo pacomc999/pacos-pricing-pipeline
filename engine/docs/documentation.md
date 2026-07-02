@@ -70,10 +70,9 @@ Back and Next buttons walk the linear path. Nothing is gated.
 - **R.** A recent R installation (developed and tested on R 4.5.2). R is the
   only required runtime; there is no separate build step.
 - **R packages.** `shiny` (the dashboard, which also brings `later` for the
-  self-shutdown timer), `fitdistrplus` (lognormal maximum likelihood), `readxl`
-  (reading Excel), and `openxlsx` (writing Excel). `testthat` is needed only to
-  run the test suite. These are installed automatically on first run (see
-  below).
+  self-shutdown timer), `readxl` (reading Excel), and `openxlsx` (writing
+  Excel). All fitting uses base R (`stats`). `testthat` is needed only to run
+  the test suite. These are installed automatically on first run (see below).
 - **Internet access (first run only).** Installing the packages needs to reach
   CRAN. On a locked-down network you can point the tool at an internal mirror by
   putting the mirror URL in a file named `CRAN_MIRROR.txt` next to the launcher.
@@ -139,12 +138,14 @@ describe each field and is ignored by the reader):
 | key | example | required | notes |
 |-----|---------|----------|-------|
 | `valuation_year` | 2026 | yes | the year all losses are revalued to |
-| `reporting_threshold` | 2 | yes | the loss size above which the data is complete; it bounds the modelling threshold from below |
+| `reporting_threshold` | 2 | yes | the loss size above which the data is complete; indexed to the valuation year it bounds the modelling threshold from below |
+| `last_complete_year` | 2025 | no | the last year with complete loss data; it ends the frequency and burning cost window (defaults to the latest loss year) |
 | `currency` | EUR | no | labels every amount in the dashboard and the export |
 | `amount_units` | millions | no | labels the scale of the figures, e.g. millions |
 
 The workbook may optionally also carry modelling defaults (modelling threshold,
-splice threshold, frequency model, simulations, loadings, VaR level). When
+splice threshold, frequency model, Pareto bias correction, simulations,
+loadings, VaR level). When
 present they seed the dashboard controls. The precedence is: dashboard control
 overrides the workbook value, which overrides the built-in default (see
 `resolve_settings` in `pipeline.R`). When neither the dashboard nor the workbook
@@ -152,6 +153,14 @@ sets the modelling threshold, it defaults to the reporting threshold (the loss
 size above which the data is complete), so the model starts exactly where the
 data becomes reliable. The threshold is strict: only losses above it are
 modelled.
+
+On load, `read_input` checks the workbook and refuses data the pipeline cannot
+price safely, with a plain message naming the sheet to fix: missing or
+non-positive losses, missing years, duplicate exposure or inflation years,
+non-positive exposures, loss years with no exposure row, and inflation that
+does not cover the span from the oldest loss to the valuation year. Losses at
+or below the reporting threshold are accepted but flagged with a warning on
+the Data step, since they contradict the declared completeness threshold.
 
 **Sheet `losses`** (one row per individual loss):
 
@@ -180,13 +189,18 @@ constant):
 ## Output
 
 When you download results from the dashboard, or pass an `output_path` to
-`run_pricing`, the tool writes a two-sheet workbook:
+`run_pricing`, the tool writes a four-sheet workbook (the same builder serves
+both paths, so the two exports never drift apart):
 
 - **`results`**: one row per layer with the expected loss, standard deviation,
-  VaR, TVaR, both premiums, the closed-form expected loss, and the
-  validation delta.
-- **`assumptions`**: an echo of the fitted parameters and the settings used, so
-  a result is self-documenting.
+  VaR, TVaR, and both premiums.
+- **`validation`**: the simulated against closed-form expected loss, their
+  delta, the Monte Carlo standard error, and the burning cost benchmark.
+- **`contract`**: an echo of the priced layer structure with its full terms
+  (deductible, cover, AAD, AAL).
+- **`assumptions`**: an echo of the settings and the fitted parameters
+  (expected claims, Pareto alpha, lognormal body, tail weight, seed), so a
+  result can be reconstructed from the file alone.
 
 ## Software architecture
 
@@ -253,6 +267,17 @@ frequency count read is therefore
 
 $$ X^{indexed} = X \cdot f^{infl}_{y}. $$
 
+**The reporting threshold must be indexed too.** The data is complete above the
+reporting threshold in each loss year's *own* money. Once losses are indexed,
+that guarantee only holds above the threshold indexed the same way, so the
+floor for the modelling threshold is the reporting threshold times the largest
+inflation factor across the observed years (with positive inflation, the
+earliest year): $RT \cdot \max_y f^{infl}_{y}$. Modelling below this floor
+understates the frequency, because losses that would index above MT were never
+recorded in the early years. This is `indexed_reporting_threshold` in
+`preprocess.R`; the dashboard clamps the modelling threshold to it, and the
+headless path warns when a supplied threshold sits below it.
+
 **Exposure drives frequency, not severity.** Exposure is a volume measure (for
 example the number of risks or buildings insured): it governs how many claims
 happen, not how big each one is, so it is deliberately not applied to the loss
@@ -283,9 +308,15 @@ to the user.)
 
 The frequency is calibrated from the annual counts of losses **above the
 modelling threshold** (the same conditioning used for the severity, so the two
-are coherent). The user can choose one of three distributions; Poisson is the
-principled default because reinsurance data is usually too sparse to select a
-distribution class from the data alone.
+are coherent). The observation window runs over the exposure years up to the
+declared last complete experience year (`observation_years` in
+`preprocess.R`). When no such year is declared, the window ends at the latest
+loss year; declaring it matters because the latest loss year is itself random:
+a genuine zero-loss final year would otherwise be dropped (overstating the
+frequency) and a partially observed final year would be counted in full
+(understating it). The user can choose one of three distributions; Poisson is
+the principled default because reinsurance data is usually too sparse to
+select a distribution class from the data alone.
 
 Let $m$ be the mean and $v$ the variance of the annual counts.
 
@@ -305,15 +336,23 @@ The severity is modelled **conditional on a loss exceeding the modelling
 threshold MT**, because only those losses enter the model. Above MT the
 distribution is spliced at a higher point $s$ (the splice threshold):
 
-- **Body, for $MT < X \le s$:** a lognormal$(\mu, \sigma)$ fitted by maximum
-  likelihood (via `fitdistrplus`) on the indexed losses in that range, used as a
-  lognormal truncated to $(MT, s]$.
+- **Body, for $MT < X \le s$:** a lognormal$(\mu, \sigma)$ fitted by
+  **truncated** maximum likelihood on the indexed losses in that range
+  (`fit_lnorm_truncated`): the likelihood is that of the lognormal conditioned
+  to $(MT, s]$, matching exactly how the body is used. An unconditional fit on
+  the windowed data would bias $\mu$ and $\sigma$, explaining the missing tails
+  as low variance.
 - **Tail, for $X > s$:** a Pareto with lower bound $x_0 = s$ and shape $\alpha$
-  estimated by maximum likelihood:
+  estimated by maximum likelihood with a small-sample bias correction:
 
-$$ \hat\alpha = \frac{n}{\sum_i \log(x_i / s)} $$
+$$ \hat\alpha = \frac{n - 1}{\sum_i \log(x_i / s)} $$
 
-over the losses above $s$.
+over the $n$ losses above $s$. The plain MLE $n / \sum_i \log(x_i / s)$ is
+biased upward (its expectation is $\alpha \cdot n / (n-1)$), which understates
+the tail exactly where reinsurance samples are thinnest; the $(n-1)/n$ factor
+removes that bias. The correction can be switched off in the dashboard (or via
+the `pareto_bias_correction` setting) to reproduce the plain MLE used in the
+Reinsurance Analytics notes; with a single tail loss the plain MLE is kept.
 
 - **Tail weight:** the empirical probability of being in the tail given a
   modelled loss,
@@ -402,6 +441,10 @@ Two premium principles are reported, both driven by user-set loadings:
 
 $$ P_{EV} = (1 + \theta_{EV})\, E[L], \qquad P_{SD} = E[L] + \theta_{SD}\,\mathrm{sd}[L]. $$
 
+Both are **pure technical premiums**: the loading is a risk margin only, with
+no allowance for expenses, brokerage, or cost of capital. A market premium
+would sit above these figures.
+
 ## Validation: an independent oracle
 
 The simulation is cross-checked by a calculation that shares none of its
@@ -415,7 +458,10 @@ The tool computes this integral by **deterministic numerical integration** of
 the conditional survival $S$ (`expected_layer_loss` in `validate.R`), so it is
 genuinely independent of the Monte Carlo path. As the number of simulations
 grows, the simulated expected loss must converge to this oracle; the dashboard's
-Validation table shows both and their difference per layer.
+Validation table shows both and their difference per layer, together with the
+**Monte Carlo standard error** $\mathrm{sd}[L] / \sqrt{n_{sims}}$ as the
+yardstick for that difference: a delta within about two standard errors is
+simulation noise, a larger one is worth investigating.
 
 For a layer that sits entirely in the Pareto tail ($D \ge s$) the integral has a
 closed form, which is kept as a unit-test anchor that the numerical integrator
