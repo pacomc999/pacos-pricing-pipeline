@@ -1,7 +1,15 @@
-# Maximum likelihood alpha for a Pareto with known lower bound x0.
-fit_pareto_alpha <- function(x, x0) {
+# Maximum likelihood alpha for a Pareto with known lower bound x0. The MLE
+# n / sum(log(x / x0)) is biased upward in small samples (its expectation is
+# alpha * n / (n - 1)), which understates the tail exactly where reinsurance
+# samples are thinnest, so by default the unbiased (n - 1)/n correction is
+# applied. With a single point the factor would zero the alpha, so the plain
+# MLE is kept there. bias_correct = FALSE gives the uncorrected MLE (the form
+# used in the Reinsurance Analytics notes).
+fit_pareto_alpha <- function(x, x0, bias_correct = TRUE) {
   x <- x[x > x0]
-  length(x) / sum(log(x / x0))
+  n <- length(x)
+  alpha <- n / sum(log(x / x0))
+  if (bias_correct && n >= 2) alpha * (n - 1) / n else alpha
 }
 
 # Truncated lognormal MLE on (lo, hi]: maximises the likelihood of the body
@@ -25,7 +33,8 @@ fit_lnorm_truncated <- function(x, lo, hi) {
 
 # Fits the spliced severity conditional on X > mt: lognormal body on (mt, s],
 # Pareto tail on (s, Inf). Continuity at s comes from the mixture weight.
-fit_severity <- function(loss_values, mt, s) {
+# bias_correct is passed through to fit_pareto_alpha.
+fit_severity <- function(loss_values, mt, s, bias_correct = TRUE) {
   modelled <- loss_values[loss_values > mt]   # only losses above MT are modelled
   body <- modelled[modelled <= s]             # (mt, s]
   tail <- modelled[modelled > s]              # (s, Inf)
@@ -42,7 +51,7 @@ fit_severity <- function(loss_values, mt, s) {
   }
 
   list(mt = mt, s = s, weight = weight, lnorm = lnorm, n_body = length(body),
-       pareto = list(x0 = s, alpha = fit_pareto_alpha(tail, s)))
+       pareto = list(x0 = s, alpha = fit_pareto_alpha(tail, s, bias_correct)))
 }
 
 # Caution for the dashboard about the lognormal body. The body is only "active"

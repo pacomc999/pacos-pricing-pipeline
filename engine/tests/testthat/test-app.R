@@ -42,7 +42,8 @@ test_that("validation_report blanks the closed form for aggregate layers", {
 
 test_that("assumptions_report carries the settings and the fitted parameters", {
   settings <- list(modelling_threshold = 5, splice_threshold = 15,
-                   frequency_model = "poisson", n_simulations = 1000L,
+                   frequency_model = "poisson", pareto_bias_correction = TRUE,
+                   n_simulations = 1000L,
                    loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
   parameters <- list(valuation_year = 2026L, currency = "EUR",
                      amount_units = "millions", last_complete_year = NA_integer_)
@@ -63,6 +64,7 @@ test_that("assumptions_report carries the settings and the fitted parameters", {
   # The settings and data parameters are echoed too.
   expect_equal(get("valuation_year"), "2026")
   expect_equal(get("modelling_threshold"), "5")
+  expect_equal(get("pareto_bias_correction"), "TRUE")
   expect_equal(get("seed"), "7")
   # A single-Pareto fit (no body) reports NA lognormal parameters.
   fits$fit_severity$lnorm <- NULL

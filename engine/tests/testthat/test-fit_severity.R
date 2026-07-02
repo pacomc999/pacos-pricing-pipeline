@@ -1,6 +1,17 @@
-test_that("fit_pareto_alpha reproduces the notes alpha of 1.184", {
+test_that("fit_pareto_alpha reproduces the notes alpha and unbiases it by default", {
   x <- c(12, 9.5, 18, 13, 7, 11, 14)   # losses above s = 5
-  expect_equal(round(fit_pareto_alpha(x, x0 = 5), 3), 1.185)
+  # The plain MLE reproduces the notes figure (Reinsurance Analytics, 1.184).
+  raw <- fit_pareto_alpha(x, x0 = 5, bias_correct = FALSE)
+  expect_equal(round(raw, 3), 1.185)
+  # By default the (n - 1)/n small-sample correction applies: the MLE
+  # overstates alpha by a factor n/(n - 1) on average, understating the tail
+  # and therefore the price of high layers.
+  expect_equal(fit_pareto_alpha(x, x0 = 5), raw * 6 / 7)
+})
+
+test_that("fit_pareto_alpha keeps the plain MLE for a single tail loss", {
+  # With n = 1 the (n - 1)/n factor would zero the alpha; keep the MLE there.
+  expect_gt(fit_pareto_alpha(10, x0 = 5), 0)
 })
 
 test_that("fit_severity splits body and tail at s, conditional on mt", {

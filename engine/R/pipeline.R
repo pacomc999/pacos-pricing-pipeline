@@ -9,6 +9,9 @@ resolve_settings <- function(parameters, overrides = list()) {
     modelling_threshold = parameters$reporting_threshold,
     splice_threshold    = NA_real_,
     frequency_model     = "poisson",
+    # Unbias the Pareto alpha by default; FALSE gives the plain MLE (the form
+    # in the Reinsurance Analytics notes).
+    pareto_bias_correction = TRUE,
     n_simulations       = 100000L,
     loading_ev          = 0.1,
     loading_sd          = 0.2,
@@ -25,6 +28,7 @@ resolve_settings <- function(parameters, overrides = list()) {
     modelling_threshold = pick("modelling_threshold"),
     splice_threshold    = pick("splice_threshold"),
     frequency_model     = pick("frequency_model"),
+    pareto_bias_correction = isTRUE(pick("pareto_bias_correction")),
     n_simulations       = as.integer(pick("n_simulations")),
     loading_ev          = pick("loading_ev"),
     loading_sd          = pick("loading_sd"),
@@ -64,8 +68,11 @@ fit_models <- function(input, settings) {
   freq <- fit_frequency(counts, settings$frequency_model)
   freq <- scale_frequency(freq, exposure_frequency_factor(
     input$exposure, years, input$parameters$valuation_year))
+  # Hand-built settings lists may omit the flag; anything but an explicit
+  # FALSE keeps the default correction on.
   sev <- fit_severity(losses$loss_indexed,
-                      settings$modelling_threshold, settings$splice_threshold)
+                      settings$modelling_threshold, settings$splice_threshold,
+                      bias_correct = !isFALSE(settings$pareto_bias_correction))
   list(losses = losses, years = years, counts = counts,
        fit_frequency = freq, fit_severity = sev)
 }

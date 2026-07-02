@@ -28,6 +28,7 @@ assumptions_report <- function(settings, parameters, fits, seed = NA) {
   data.frame(
     key = c("valuation_year", "currency", "amount_units", "last_complete_year",
             "modelling_threshold", "splice_threshold", "frequency_model",
+            "pareto_bias_correction",
             "expected_claims_per_year", "pareto_alpha",
             "lognormal_meanlog", "lognormal_sdlog", "tail_weight",
             "n_simulations", "loading_ev", "loading_sd", "var_level", "seed"),
@@ -36,6 +37,8 @@ assumptions_report <- function(settings, parameters, fits, seed = NA) {
       parameters$last_complete_year,
       settings$modelling_threshold, settings$splice_threshold,
       settings$frequency_model,
+      # NULL would silently drop out of c() and misalign keys and values.
+      if (is.null(settings$pareto_bias_correction)) NA else settings$pareto_bias_correction,
       round(fits$fit_frequency$expected, 4), round(sev$pareto$alpha, 4),
       round(lnorm_mu, 4), round(lnorm_sd, 4), round(sev$weight, 4),
       settings$n_simulations, settings$loading_ev, settings$loading_sd,
