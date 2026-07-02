@@ -14,6 +14,30 @@ test_that("fit_severity splits body and tail at s, conditional on mt", {
   expect_equal(fit$n_body, 6)
 })
 
+test_that("the lognormal body is fitted by truncated maximum likelihood", {
+  # Simulate a known lognormal and keep only the observations inside the body
+  # window (mt, s]. An unconditional fit on that slice biases mu and sigma (it
+  # explains the missing tails as low variance); the truncated MLE, which
+  # matches how the body is actually used, recovers the true parameters.
+  set.seed(42)
+  x <- stats::rlnorm(200000, meanlog = 2, sdlog = 0.5)
+  body <- x[x > 5 & x <= 15]
+  fit <- fit_lnorm_truncated(body, 5, 15)
+  expect_lt(abs(fit$meanlog - 2), 0.02)
+  expect_lt(abs(fit$sdlog - 0.5), 0.02)
+})
+
+test_that("fit_severity fits the body with the truncated likelihood", {
+  set.seed(43)
+  x <- stats::rlnorm(50000, meanlog = 2, sdlog = 0.5)
+  # The body is a truncated slice of the known lognormal; add a few tail losses
+  # above the splice so the Pareto side has data too.
+  losses <- c(x[x > 5 & x <= 15], 20, 30, 50)
+  fit <- fit_severity(losses, mt = 5, s = 15)
+  expect_lt(abs(fit$lnorm$meanlog - 2), 0.05)
+  expect_lt(abs(fit$lnorm$sdlog - 0.5), 0.05)
+})
+
 test_that("severity_body_warning fires for an active, underpopulated body", {
   # Inactive body (splice = mt): never warns, whatever the count.
   expect_null(severity_body_warning(0, body_active = FALSE))

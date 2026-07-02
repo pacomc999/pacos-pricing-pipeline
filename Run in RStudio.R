@@ -63,7 +63,7 @@ launch_pipeline <- function() {
   # Install any missing runtime packages. We use stop() (not quit()) on failure
   # so a problem shows as a clear red message in the console instead of trying
   # to close RStudio.
-  runtime <- c("shiny", "later", "fitdistrplus", "readxl", "openxlsx")
+  runtime <- c("shiny", "later", "readxl", "openxlsx")
   missing <- runtime[!runtime %in% rownames(installed.packages())]
   if (length(missing) > 0) {
     message("Installing missing packages: ", paste(missing, collapse = ", "),

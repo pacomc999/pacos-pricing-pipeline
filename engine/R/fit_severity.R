@@ -4,6 +4,25 @@ fit_pareto_alpha <- function(x, x0) {
   length(x) / sum(log(x / x0))
 }
 
+# Truncated lognormal MLE on (lo, hi]: maximises the likelihood of the body
+# model as it is actually used, the lognormal conditioned to the window,
+# f(x) / (F(hi) - F(lo)). An unconditional fit on the windowed data would bias
+# mu and sigma, explaining the missing tails as low variance.
+fit_lnorm_truncated <- function(x, lo, hi) {
+  nll <- function(par) {
+    m <- par[1]; s <- exp(par[2])   # log-sd keeps the search unconstrained
+    denom <- stats::plnorm(hi, m, s) - stats::plnorm(lo, m, s)
+    if (!is.finite(denom) || denom <= 0) return(Inf)
+    -sum(stats::dlnorm(x, m, s, log = TRUE)) + length(x) * log(denom)
+  }
+  lx <- log(x)
+  # Start from the unconditional estimates; the sd is floored so identical
+  # losses (sd 0) still give a workable starting point.
+  start <- c(mean(lx), log(max(stats::sd(lx), 1e-3)))
+  opt <- stats::optim(start, nll)
+  list(meanlog = opt$par[1], sdlog = exp(opt$par[2]))
+}
+
 # Fits the spliced severity conditional on X > mt: lognormal body on (mt, s],
 # Pareto tail on (s, Inf). Continuity at s comes from the mixture weight.
 fit_severity <- function(loss_values, mt, s) {
@@ -19,9 +38,7 @@ fit_severity <- function(loss_values, mt, s) {
 
   lnorm <- NULL
   if (length(body) >= 2) {
-    fit <- fitdistrplus::fitdist(body, "lnorm")
-    lnorm <- list(meanlog = unname(fit$estimate["meanlog"]),
-                  sdlog   = unname(fit$estimate["sdlog"]))
+    lnorm <- fit_lnorm_truncated(body, mt, s)
   }
 
   list(mt = mt, s = s, weight = weight, lnorm = lnorm, n_body = length(body),

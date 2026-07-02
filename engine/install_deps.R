@@ -28,7 +28,7 @@ if (!is.na(user_lib) && nzchar(user_lib)) {
 # Packages the dashboard needs to run (later ships with shiny and is used for
 # the self-shutdown timer). testthat is only for the test suite, so it is
 # installed if possible but never blocks the app.
-runtime <- c("shiny", "later", "fitdistrplus", "readxl", "openxlsx")
+runtime <- c("shiny", "later", "readxl", "openxlsx")
 dev <- c("testthat")
 
 missing <- function(pkgs) pkgs[!pkgs %in% rownames(installed.packages())]
