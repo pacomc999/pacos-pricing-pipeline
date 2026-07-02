@@ -671,12 +671,17 @@ server <- function(input, output, session) {
     min(d)
   })
 
-  # The reporting threshold from the workbook (read straight from rv$data so it
-  # is available before the fit). The modelling threshold may not sit below it:
-  # under it the data is incomplete, so the frequency would be understated.
+  # The indexed reporting threshold (read straight from rv$data so it is
+  # available before the fit). The workbook threshold guarantees complete data
+  # in each loss year's own money; indexed to the valuation year it becomes the
+  # floor for the modelling threshold. Below it the counts are incomplete in
+  # the early years, so the frequency would be understated.
   reporting_threshold <- shiny::reactive({
-    rt <- rv$data$parameters$reporting_threshold
-    if (is.null(rt)) NA_real_ else rt
+    d <- rv$data
+    rt <- d$parameters$reporting_threshold
+    if (is.null(rt)) return(NA_real_)
+    yrs <- sort(unique(d$exposure$year[d$exposure$year <= max(d$losses$year)]))
+    indexed_reporting_threshold(rt, d$inflation, yrs, d$parameters$valuation_year)
   })
 
   # Live tower plot of the layer structure, so the user can visually check the
@@ -823,7 +828,8 @@ server <- function(input, output, session) {
   })
 
   # Keep the modelling threshold inside its valid window: at or above the
-  # reporting threshold (below it the data is incomplete) and at or below the
+  # indexed reporting threshold (below it the counts are incomplete once the
+  # losses are trended, see indexed_reporting_threshold) and at or below the
   # lowest layer deductible (above it the lowest layer's losses go unmodelled).
   # Snapping the input back beats letting an out-of-range value break the fit.
   # Fires on threshold edits and when the bounds move (new workbook or changed
@@ -844,8 +850,9 @@ server <- function(input, output, session) {
     base <- "The loss size where modelling starts; smaller losses are ignored."
     lo <- reporting_threshold(); hi <- lowest_deductible()
     if (!is.na(lo) && !is.na(hi)) {
-      base <- paste0(base, " It must be between the reporting threshold (", lo,
-                     ") and the lowest layer deductible (", hi, ").")
+      base <- paste0(base, " It must be between the indexed reporting threshold (",
+                     round(lo, 3), ", the workbook threshold trended to the",
+                     " valuation year) and the lowest layer deductible (", hi, ").")
     }
     shiny::helpText(base)
   })
@@ -872,8 +879,9 @@ server <- function(input, output, session) {
     lo <- reporting_threshold(); hi <- lowest_deductible()
     shiny::validate(shiny::need(
       is.na(lo) || is.na(hi) || lo <= hi,
-      paste0("The reporting threshold (", lo, ") is above the lowest layer deductible (",
-             hi, "). Lower the reporting threshold in the workbook or raise the deductible.")))
+      paste0("The indexed reporting threshold (", round(lo, 3),
+             ") is above the lowest layer deductible (", hi,
+             "). Lower the reporting threshold in the workbook or raise the deductible.")))
     # The splice threshold is only needed (and shown) for the spliced model.
     if (identical(input$sev_model, "spliced")) {
       shiny::validate(

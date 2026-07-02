@@ -36,6 +36,23 @@ inflation_factor <- function(inflation, loss_year, valuation_year) {
   if (valuation_year < loss_year) 1 / factor else factor
 }
 
+# The completeness floor for the modelling threshold, in valuation-year money.
+# The reporting threshold guarantees complete data in each loss year's OWN
+# money. Once losses are indexed, that guarantee only holds above the threshold
+# indexed the same way, so the binding floor is the reporting threshold times
+# the largest inflation factor across the observed years (with positive
+# inflation, the earliest year). Modelling below this floor understates the
+# frequency: losses that would index above MT were never recorded in the early
+# years because they sat below the reporting threshold at the time.
+indexed_reporting_threshold <- function(reporting_threshold, inflation,
+                                        observed_years, valuation_year) {
+  if (length(observed_years) == 0) return(reporting_threshold)
+  factors <- vapply(observed_years, function(y) {
+    inflation_factor(inflation, y, valuation_year)
+  }, numeric(1))
+  reporting_threshold * max(factors)
+}
+
 # Trends each loss to the valuation year for loss inflation only, restating old
 # losses in today's money. Exposure is deliberately not applied here: it is a
 # volume measure that drives how many claims happen (frequency), not how big each

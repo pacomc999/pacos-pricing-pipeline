@@ -42,6 +42,19 @@ fit_models <- function(input, settings) {
   # prospective valuation year carries exposure but no losses).
   obs_years <- input$exposure$year[input$exposure$year <= max(input$losses$year)]
   years <- sort(unique(obs_years))
+  # The data is only complete above the reporting threshold in each loss year's
+  # own money, so the counts (taken on indexed losses) are only complete above
+  # the indexed reporting threshold. The dashboard clamps MT to that floor; the
+  # headless path warns instead of failing, since the fit still runs.
+  floor_mt <- indexed_reporting_threshold(
+    input$parameters$reporting_threshold, input$inflation,
+    years, input$parameters$valuation_year)
+  if (settings$modelling_threshold < floor_mt) {
+    warning("The modelling threshold (", settings$modelling_threshold,
+            ") is below the indexed reporting threshold (", round(floor_mt, 4),
+            "): counts near the threshold are incomplete in the early years,",
+            " so the fitted frequency is understated.")
+  }
   counts <- annual_counts(
     data.frame(year = losses$year, loss = losses$loss_indexed),
     years, settings$modelling_threshold)

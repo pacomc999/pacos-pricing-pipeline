@@ -86,6 +86,19 @@ test_that("index_losses trends losses for inflation only, not exposure", {
   expect_equal(round(out$loss_indexed[1], 2), 13.25)
 })
 
+test_that("indexed_reporting_threshold compounds the completeness floor", {
+  # Zero inflation: indexing changes nothing, the floor is the nominal threshold.
+  flat <- data.frame(year = 2021:2026, inflation = rep(0, 6))
+  expect_equal(indexed_reporting_threshold(2, flat, 2021:2025, 2026), 2)
+  # 10% a year: the binding year is the earliest one (largest factor). A 2021
+  # loss revalued to 2026 accrues the 2022 to 2026 rates, so the floor is
+  # 2 * 1.1^5.
+  steep <- data.frame(year = 2021:2026, inflation = rep(0.10, 6))
+  expect_equal(indexed_reporting_threshold(2, steep, 2021:2025, 2026), 2 * 1.1^5)
+  # With no observed years there is nothing to index; fall back to nominal.
+  expect_equal(indexed_reporting_threshold(2, steep, integer(0), 2026), 2)
+})
+
 test_that("inflation_factor compounds a per-year rate vector", {
   inflation <- data.frame(year = 2021:2026,
                           inflation = c(0.02, 0.03, 0.025, 0.04, 0.03, 0.035))

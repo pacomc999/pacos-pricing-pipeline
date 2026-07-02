@@ -162,6 +162,24 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   expect_true(abs(res$expected_loss[3] - 2.12) < 0.15)
 })
 
+test_that("fit_models warns when MT sits below the indexed reporting threshold", {
+  # 10% inflation and RT = 2: the completeness floor in 2024 money is
+  # 2 * 1.1^3 = 2.66 (binding year 2021). An MT of 2 sits below it.
+  input <- list(
+    losses = data.frame(year = c(2021, 2022, 2023), loss = c(8, 9, 10)),
+    exposure = data.frame(year = 2021:2024, exposure = rep(100, 4)),
+    inflation = data.frame(year = 2021:2024, inflation = rep(0.10, 4)),
+    parameters = list(valuation_year = 2024L, reporting_threshold = 2)
+  )
+  low <- list(modelling_threshold = 2, splice_threshold = 2,
+              frequency_model = "poisson")
+  expect_warning(fit_models(input, low), "indexed reporting threshold")
+  # An MT at or above the floor is fine: no warning.
+  ok <- list(modelling_threshold = 3, splice_threshold = 3,
+             frequency_model = "poisson")
+  expect_no_warning(fit_models(input, ok))
+})
+
 test_that("resolve_settings defaults the modelling threshold to the reporting threshold", {
   params <- list(valuation_year = 2026L, reporting_threshold = 5)
 

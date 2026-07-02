@@ -70,7 +70,9 @@ test_that("scaling losses, thresholds and the layer by k scales the price by exa
   s_base <- mk_settings(base$parameters, mt = 5)
   s_k    <- mk_settings(scaled$parameters, mt = 5 * k)
   fb <- fit_models(base, s_base)
-  fk <- fit_models(scaled, s_k)
+  # The constructed (k - 1) valuation-year inflation puts MT below the indexed
+  # reporting threshold, so fit_models warns; that is expected here.
+  fk <- suppressWarnings(fit_models(scaled, s_k))
   pb <- price_models(fb, contract_base, s_base, seed = 1)
   pk <- price_models(fk, contract_k, s_k, seed = 1)
 
@@ -91,7 +93,9 @@ test_that("inflation moves the frequency only through losses crossing the thresh
   infl <- mk_input(hi, 2026, 3,
     inflation = data.frame(year = 2021:2026, inflation = c(0, 0, 0, 0, 0, 1)))  # x2
   s <- mk_settings(base$parameters, mt = 5)
-  expect_equal(fit_models(infl, s)$fit_frequency$expected,
+  # The 100% valuation-year inflation puts MT below the indexed reporting
+  # threshold, so fit_models warns; that is expected in this limit case.
+  expect_equal(suppressWarnings(fit_models(infl, s))$fit_frequency$expected,
                fit_models(base, s)$fit_frequency$expected)
 
   # A loss of 4 sits below MT; doubling it to 8 lifts it above MT, so the count
@@ -113,7 +117,9 @@ test_that("doubling the losses with the layer and thresholds fixed does NOT doub
     inflation = data.frame(year = 2021:2026, inflation = c(0, 0, 0, 0, 0, 1)))  # x2
   s <- mk_settings(base$parameters, mt = 5)
   pb <- price_models(fit_models(base, s), contract, s, seed = 1)
-  pd <- price_models(fit_models(dbl, s), contract, s, seed = 1)
+  # The 100% valuation-year inflation puts MT below the indexed reporting
+  # threshold, so fit_models warns; that is expected in this limit case.
+  pd <- price_models(suppressWarnings(fit_models(dbl, s)), contract, s, seed = 1)
 
   # With the layer and MT fixed in money, doubling the losses does not give 2x:
   # the layer caps are non-linear and the severity is conditioned at a fixed MT.
