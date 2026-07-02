@@ -17,6 +17,31 @@ results_report <- function(results) {
   )
 }
 
+# One assumptions sheet for both export paths (headless run_pricing and the
+# dashboard download), so the audit trail always carries the settings AND the
+# fitted parameters. The downloaded file is what travels; together with the
+# contract echo a result should be reconstructible from it alone.
+assumptions_report <- function(settings, parameters, fits, seed = NA) {
+  sev <- fits$fit_severity
+  lnorm_mu <- if (is.null(sev$lnorm)) NA_real_ else sev$lnorm$meanlog
+  lnorm_sd <- if (is.null(sev$lnorm)) NA_real_ else sev$lnorm$sdlog
+  data.frame(
+    key = c("valuation_year", "currency", "amount_units", "last_complete_year",
+            "modelling_threshold", "splice_threshold", "frequency_model",
+            "expected_claims_per_year", "pareto_alpha",
+            "lognormal_meanlog", "lognormal_sdlog", "tail_weight",
+            "n_simulations", "loading_ev", "loading_sd", "var_level", "seed"),
+    value = as.character(c(
+      parameters$valuation_year, parameters$currency, parameters$amount_units,
+      parameters$last_complete_year,
+      settings$modelling_threshold, settings$splice_threshold,
+      settings$frequency_model,
+      round(fits$fit_frequency$expected, 4), round(sev$pareto$alpha, 4),
+      round(lnorm_mu, 4), round(lnorm_sd, 4), round(sev$weight, 4),
+      settings$n_simulations, settings$loading_ev, settings$loading_sd,
+      settings$var_level, seed)))
+}
+
 # The validation table: simulated against closed-form expected loss, their
 # delta with the Monte Carlo standard error as its yardstick (a delta within
 # about two standard errors is simulation noise), the burning cost benchmark

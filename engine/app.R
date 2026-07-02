@@ -1075,6 +1075,11 @@ server <- function(input, output, session) {
       out$burning_cost <- burning_cost(f$losses, ct, inp$exposure,
                                        inp$parameters$valuation_year,
                                        inp$parameters$last_complete_year)
+      # Keep the fits and the contract that were actually priced, so the
+      # download's audit trail matches these results even if the controls are
+      # edited afterwards.
+      out$fits <- f
+      out$contract <- ct
       out
     })
   })
@@ -1213,16 +1218,14 @@ server <- function(input, output, session) {
       st <- settings()
       p <- priced()
       gp <- input_data()$parameters
-      assumptions <- data.frame(
-        key = c("valuation_year", "currency", "amount_units",
-                "modelling_threshold", "splice_threshold", "frequency_model",
-                "n_simulations", "loading_ev", "loading_sd", "var_level"),
-        value = c(gp$valuation_year, gp$currency, gp$amount_units,
-                  st$modelling_threshold, st$splice_threshold, st$frequency_model,
-                  st$n_simulations, st$loading_ev, st$loading_sd, st$var_level))
+      # One shared assumptions builder with the headless path (see report.R):
+      # the download carries the fitted parameters and the priced contract, so
+      # the emailed file documents the run completely.
+      assumptions <- assumptions_report(st, gp, p$fits, seed = input$seed)
       # The Excel sheets mirror the dashboard's Results and Validation tables.
       write_output(file, results_report(p$results), assumptions,
-                   validation = validation_report(p$results, p$burning_cost))
+                   validation = validation_report(p$results, p$burning_cost),
+                   contract = p$contract)
     }
   )
 }

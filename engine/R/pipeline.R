@@ -118,17 +118,14 @@ run_pricing <- function(input_path, overrides = list(),
                      input$parameters$last_complete_year)
 
   if (!is.null(output_path)) {
-    assumptions <- data.frame(
-      key = c("frequency_model", "lambda", "pareto_alpha",
-              "modelling_threshold", "splice_threshold",
-              "n_simulations", "valuation_year"),
-      value = c(settings$frequency_model, round(fits$fit_frequency$expected, 4),
-                round(fits$fit_severity$pareto$alpha, 4),
-                settings$modelling_threshold, settings$splice_threshold,
-                settings$n_simulations, input$parameters$valuation_year))
+    # One shared assumptions builder for both export paths (see report.R), so
+    # the headless file and the dashboard download never drift apart.
+    assumptions <- assumptions_report(settings, input$parameters, fits,
+                                      seed = if (is.null(seed)) NA else seed)
     # The Excel sheets mirror the dashboard's Results and Validation tables.
     write_output(output_path, results_report(results), assumptions,
-                 validation = validation_report(results, bc))
+                 validation = validation_report(results, bc),
+                 contract = contract)
   }
 
   list(results = results, fit_frequency = fits$fit_frequency,

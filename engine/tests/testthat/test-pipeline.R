@@ -192,6 +192,42 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   expect_true(abs(res$expected_loss[3] - 2.12) < 0.15)
 })
 
+test_that("run_pricing writes the shared assumptions and the contract echo", {
+  path <- tempfile(fileext = ".xlsx")
+  wb <- openxlsx::createWorkbook()
+  openxlsx::addWorksheet(wb, "losses")
+  openxlsx::writeData(wb, "losses", data.frame(
+    year = c(2021, 2022, 2023, 2023), loss = c(12, 18, 9.5, 14),
+    line_of_business = "fire"))
+  openxlsx::addWorksheet(wb, "exposure")
+  openxlsx::writeData(wb, "exposure", data.frame(
+    year = 2021:2024, exposure = rep(100, 4)))
+  openxlsx::addWorksheet(wb, "inflation")
+  openxlsx::writeData(wb, "inflation", data.frame(
+    year = 2021:2024, inflation = rep(0, 4)))
+  openxlsx::addWorksheet(wb, "general inputs")
+  openxlsx::writeData(wb, "general inputs", data.frame(
+    key = c("modelling_threshold", "splice_threshold", "frequency_model",
+            "n_simulations", "valuation_year", "loading_ev", "loading_sd",
+            "var_level", "reporting_threshold"),
+    value = c("5", "5", "poisson", "2000", "2024", "0.1", "0.2", "0.99", "2")))
+  openxlsx::saveWorkbook(wb, path)
+
+  contract <- data.frame(deductible = c(5, 10), cover = c(5, 10),
+                         aad = c(0, 2), aal = c(0, 8))
+  out <- tempfile(fileext = ".xlsx")
+  run_pricing(path, contract = contract, output_path = out, seed = 1)
+
+  sheets <- readxl::excel_sheets(out)
+  expect_true(all(c("results", "validation", "contract", "assumptions") %in% sheets))
+  # The assumptions sheet carries the fitted parameters, not just the settings.
+  a <- as.data.frame(readxl::read_excel(out, sheet = "assumptions"))
+  expect_true(all(c("expected_claims_per_year", "pareto_alpha", "seed") %in% a$key))
+  # The contract echo preserves the full layer terms.
+  ct <- as.data.frame(readxl::read_excel(out, sheet = "contract"))
+  expect_equal(ct$aal, c(0, 8))
+})
+
 test_that("fit_models warns when MT sits below the indexed reporting threshold", {
   # 10% inflation and RT = 2: the completeness floor in 2024 money is
   # 2 * 1.1^3 = 2.66 (binding year 2021). An MT of 2 sits below it.

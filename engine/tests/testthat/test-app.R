@@ -40,6 +40,36 @@ test_that("validation_report blanks the closed form for aggregate layers", {
   expect_equal(tbl[["MC std error"]][1], 0.0123)
 })
 
+test_that("assumptions_report carries the settings and the fitted parameters", {
+  settings <- list(modelling_threshold = 5, splice_threshold = 15,
+                   frequency_model = "poisson", n_simulations = 1000L,
+                   loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
+  parameters <- list(valuation_year = 2026L, currency = "EUR",
+                     amount_units = "millions", last_complete_year = NA_integer_)
+  fits <- list(
+    fit_frequency = list(type = "poisson", params = list(lambda = 1.4),
+                         expected = 1.4),
+    fit_severity = list(mt = 5, s = 15, weight = 0.3,
+                        lnorm = list(meanlog = 2.1, sdlog = 0.4),
+                        pareto = list(x0 = 15, alpha = 1.5)))
+  tbl <- assumptions_report(settings, parameters, fits, seed = 7)
+  expect_equal(names(tbl), c("key", "value"))
+  get <- function(k) tbl$value[tbl$key == k]
+  # The fitted parameters are the heart of the audit trail.
+  expect_equal(get("expected_claims_per_year"), "1.4")
+  expect_equal(get("pareto_alpha"), "1.5")
+  expect_equal(get("lognormal_meanlog"), "2.1")
+  expect_equal(get("tail_weight"), "0.3")
+  # The settings and data parameters are echoed too.
+  expect_equal(get("valuation_year"), "2026")
+  expect_equal(get("modelling_threshold"), "5")
+  expect_equal(get("seed"), "7")
+  # A single-Pareto fit (no body) reports NA lognormal parameters.
+  fits$fit_severity$lnorm <- NULL
+  tbl2 <- assumptions_report(settings, parameters, fits, seed = 7)
+  expect_true(is.na(tbl2$value[tbl2$key == "lognormal_meanlog"]))
+})
+
 test_that("build_contract_df keeps only the pricing columns in order", {
   rows <- data.frame(id = 1:2, deductible = c(5, 10), cover = c(5, 10),
                      aad = c(0, 0), aal = c(0, 0))

@@ -148,17 +148,25 @@ validate_input <- function(losses, exposure, inflation, parameters) {
   warnings
 }
 
-# Writes the pricing results, an optional validation table and the assumptions
-# echo to a workbook. The results and validation sheets mirror the dashboard
-# tables (same columns and order); validation is optional for backward
-# compatibility, so callers that only need results can omit it.
-write_output <- function(path, results, assumptions, validation = NULL) {
+# Writes the pricing results, an optional validation table, an optional echo of
+# the priced contract, and the assumptions echo to a workbook. The results and
+# validation sheets mirror the dashboard tables (same columns and order);
+# validation and contract are optional for backward compatibility, so callers
+# that only need results can omit them.
+write_output <- function(path, results, assumptions, validation = NULL,
+                         contract = NULL) {
   wb <- openxlsx::createWorkbook()
   openxlsx::addWorksheet(wb, "results")
   openxlsx::writeData(wb, "results", results)
   if (!is.null(validation)) {
     openxlsx::addWorksheet(wb, "validation")
     openxlsx::writeData(wb, "validation", validation)
+  }
+  # The full layer terms (AAD and AAL included), so the run can be
+  # reconstructed from the file alone.
+  if (!is.null(contract)) {
+    openxlsx::addWorksheet(wb, "contract")
+    openxlsx::writeData(wb, "contract", contract)
   }
   openxlsx::addWorksheet(wb, "assumptions")
   openxlsx::writeData(wb, "assumptions", assumptions)
