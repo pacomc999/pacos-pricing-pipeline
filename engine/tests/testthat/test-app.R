@@ -57,6 +57,14 @@ test_that("validate_contract rejects empty and invalid programs", {
   expect_null(validate_contract(good))
 })
 
+test_that("validate_contract rejects a blank (NA) deductible", {
+  # A cleared deductible input arrives as NA. It must be caught here: pricing
+  # with an NA deductible turns every result into NA with no explanation.
+  na_ded <- data.frame(deductible = NA_real_, cover = 5,
+                       aad = NA_real_, aal = NA_real_)
+  expect_match(validate_contract(na_ded), "deductible")
+})
+
 test_that("build_structure_plot_data computes tops and labels, dropping bad rows", {
   ct <- data.frame(deductible = c(0, 5, 10),
                    cover = c(5, 5, 0),          # third row: cover 0 -> dropped

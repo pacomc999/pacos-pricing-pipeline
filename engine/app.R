@@ -37,8 +37,8 @@ validate_contract <- function(contract) {
   if (any(is.na(contract$cover)) || any(contract$cover <= 0)) {
     return("Every layer needs a cover greater than 0.")
   }
-  if (any(contract$deductible < 0, na.rm = TRUE)) {
-    return("Deductible cannot be negative.")
+  if (any(is.na(contract$deductible)) || any(contract$deductible < 0)) {
+    return("Every layer needs a deductible of 0 or more.")
   }
   if (any(contract$aad < 0, na.rm = TRUE) || any(contract$aal < 0, na.rm = TRUE)) {
     return("AAD and AAL cannot be negative.")
