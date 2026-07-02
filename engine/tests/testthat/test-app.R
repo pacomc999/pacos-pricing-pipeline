@@ -28,12 +28,16 @@ test_that("results_report rounds, renames and puts cover before deductible", {
 
 test_that("validation_report blanks the closed form for aggregate layers", {
   priced <- data.frame(deductible = 5, cover = 5, expected_loss = 4.5,
+                       mc_se = 0.0123456,
                        oracle = c(NA_real_), oracle_delta = c(NA_real_))
   bc <- data.frame(bc_advanced = 3.2)
   tbl <- validation_report(priced, bc)
   expect_equal(names(tbl)[1:2], c("Cover", "Deductible"))
   expect_true(is.na(tbl[["Closed form"]][1]))
   expect_match(tbl$Note[1], "no closed form")
+  # The MC standard error gives the delta a yardstick: within about two
+  # standard errors is simulation noise.
+  expect_equal(tbl[["MC std error"]][1], 0.0123)
 })
 
 test_that("build_contract_df keeps only the pricing columns in order", {

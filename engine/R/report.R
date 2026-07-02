@@ -17,9 +17,11 @@ results_report <- function(results) {
   )
 }
 
-# The validation table: simulated against closed-form expected loss, their delta,
-# the burning cost benchmark and a note. The closed form is blank (NA) for layers
-# with aggregate conditions, which the note flags.
+# The validation table: simulated against closed-form expected loss, their
+# delta with the Monte Carlo standard error as its yardstick (a delta within
+# about two standard errors is simulation noise), the burning cost benchmark
+# and a note. The closed form is blank (NA) for layers with aggregate
+# conditions, which the note flags.
 validation_report <- function(results, burning_cost) {
   note <- ifelse(is.na(results$oracle),
                  "Aggregate conditions: no closed form", "")
@@ -29,6 +31,7 @@ validation_report <- function(results, burning_cost) {
     Simulated = round(results$expected_loss, 3),
     `Closed form` = round(results$oracle, 3),
     Delta = round(results$oracle_delta, 4),
+    `MC std error` = round(results$mc_se, 4),
     `Burning cost` = round(burning_cost$bc_advanced, 3),
     Note = note,
     check.names = FALSE
