@@ -98,6 +98,9 @@ test_that("read_input errors clearly on a missing required parameter", {
     data.frame(key = "modelling_threshold", value = "5"))
   openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
   expect_error(read_input(path), "Missing required parameter")
+  # The message must name the sheet as it appears in the workbook, so the user
+  # can find it: the sheet is called 'general inputs', not 'parameters'.
+  expect_error(read_input(path), "general inputs")
 })
 
 test_that("read_input errors clearly when a required sheet is missing", {

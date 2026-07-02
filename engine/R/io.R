@@ -25,7 +25,7 @@ read_input <- function(path) {
   # Required parameters describe the data and the valuation basis.
   num <- function(k) {
     if (!k %in% names(pv) || is.na(pv[[k]])) {
-      stop("Missing required parameter in the 'parameters' sheet: ", k)
+      stop("Missing required parameter in the 'general inputs' sheet: ", k)
     }
     as.numeric(pv[[k]])
   }
