@@ -31,9 +31,6 @@ layer_annual_losses <- function(sims, layer_row) {
 summarise_layer_losses <- function(annual, layer_row, premium_params) {
   expected_loss <- mean(annual)
   sd_loss <- stats::sd(annual)
-  # Monte Carlo standard error of the expected loss: the yardstick for the
-  # validation delta (a delta within about two of these is simulation noise).
-  mc_se <- sd_loss / sqrt(length(annual))
   var_q <- stats::quantile(annual, premium_params$var_level, names = FALSE)
   tvar <- mean(annual[annual >= var_q])
 
@@ -42,7 +39,7 @@ summarise_layer_losses <- function(annual, layer_row, premium_params) {
 
   data.frame(
     cover = layer_row$cover, deductible = layer_row$deductible,
-    expected_loss = expected_loss, sd_loss = sd_loss, mc_se = mc_se,
+    expected_loss = expected_loss, sd_loss = sd_loss,
     var = var_q, tvar = tvar,
     premium_ev = premium_ev, premium_sd = premium_sd
   )

@@ -24,17 +24,6 @@ test_that("layer_annual_losses returns one annual loss per simulated year", {
   expect_equal(price_layer(sims, layer, pp)$expected_loss, mean(annual))
 })
 
-test_that("the layer summary reports the Monte Carlo standard error", {
-  # The MC standard error sizes the simulation noise on the expected loss:
-  # sd of the annual losses over the square root of the number of years.
-  sims <- list(c(8, 8), numeric(0), c(12, 3, 7), c(9))
-  layer <- data.frame(deductible = 5, cover = 5, aad = 0, aal = 0)
-  pp <- list(loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
-  annual <- layer_annual_losses(sims, layer)
-  row <- summarise_layer_losses(annual, layer, pp)
-  expect_equal(row$mc_se, stats::sd(annual) / sqrt(length(annual)))
-})
-
 test_that("price_layer expected loss converges to the validation oracle", {
   # Spliced severity with a real lognormal body; layer 5 xs 5 dips into it.
   set.seed(11)

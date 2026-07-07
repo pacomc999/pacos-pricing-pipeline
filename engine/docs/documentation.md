@@ -194,7 +194,7 @@ both paths, so the two exports never drift apart):
 - **`results`**: one row per layer with the expected loss, standard deviation,
   VaR, TVaR, and both premiums.
 - **`validation`**: the simulated against closed-form expected loss, their
-  delta, the Monte Carlo standard error, and the burning cost benchmark.
+  delta, and the burning cost benchmark.
 - **`contract`**: an echo of the priced layer structure with its full terms
   (deductible, cover, AAD, AAL).
 - **`assumptions`**: an echo of the settings and the fitted parameters
@@ -455,10 +455,11 @@ The tool computes this integral by **deterministic numerical integration** of
 the conditional survival $S$ (`expected_layer_loss` in `validate.R`), so it is
 genuinely independent of the Monte Carlo path. As the number of simulations
 grows, the simulated expected loss must converge to this oracle; the dashboard's
-Validation table shows both and their difference per layer, together with the
-**Monte Carlo standard error** $\mathrm{sd}[L] / \sqrt{n_{sims}}$ as the
-yardstick for that difference: a delta within about two standard errors is
-simulation noise, a larger one is worth investigating.
+Validation table shows both and their difference per layer. Small differences
+are expected: they are simulation noise, and they shrink as the number of
+simulations grows. At the default 100,000 simulations that noise is negligible
+next to the real uncertainty in the price, which comes from fitting a handful
+of losses, so the delta is a bug check, not an uncertainty measure.
 
 For a layer that sits entirely in the Pareto tail ($D \ge s$) the integral has a
 closed form, which is kept as a unit-test anchor that the numerical integrator

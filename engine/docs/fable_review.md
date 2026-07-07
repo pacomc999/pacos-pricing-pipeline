@@ -13,10 +13,15 @@ uncertainty) stays open, as do the smaller suggestions not in the table
 sample size notes on the Model step). The technical premium wording and the
 multi-user hosting note were covered in the documentation pass.
 
-**Update, 7 July 2026:** item 9 (the Pareto alpha bias correction) was removed
-again by Francisco's decision: it added complexity he judged unjustified, and
-the plain MLE keeps the tool aligned with the Reinsurance Analytics notes. The
-finding in section 1.4 stands as a known, accepted limitation.
+**Update, 7 July 2026:** items 6 and 9 were removed again by Francisco's
+decision. Item 9 (the Pareto alpha bias correction) added complexity he judged
+unjustified; the plain MLE keeps the tool aligned with the Reinsurance
+Analytics notes, and the finding in section 1.4 stands as a known, accepted
+limitation. Item 6 (the Monte Carlo standard error column) was judged useless
+in practice: at the default simulation count the Monte Carlo noise is
+negligible next to the parameter uncertainty from fitting a handful of losses,
+so the column suggested precision the price does not have. The real answer to
+section 1.5 would be the bootstrap of item 10, which remains open.
 
 ## Overall verdict
 
@@ -262,7 +267,7 @@ assumptions sheets) is exactly where drift crept in.
 | 3 | Index the reporting threshold in the MT clamp | small | `engine/app.R:831`, `engine/docs/documentation.md` | Fixed: `indexed_reporting_threshold` in `engine/R/preprocess.R`; the headless path warns |
 | 4 | Last complete experience year input | small | `engine/R/io.R:43`, `engine/R/pipeline.R:42`, `engine/R/preprocess.R:74`, `engine/R/template.R:30` | Fixed: `observation_years` in `engine/R/preprocess.R`; optional `last_complete_year` general input |
 | 5 | Input validation on the workbook | medium | `engine/R/io.R:5` | Fixed: `validate_input` in `engine/R/io.R`; soft warnings shown on the Data step |
-| 6 | Monte Carlo standard error in the validation table | small | `engine/R/report.R:23`, `engine/R/pipeline.R:86` | Fixed: `mc_se` in `engine/R/price.R`, new column in `validation_report` |
+| 6 | Monte Carlo standard error in the validation table | small | `engine/R/report.R:23`, `engine/R/pipeline.R:86` | Implemented, then removed by decision (7 July 2026): MC noise is negligible next to parameter uncertainty, so the column suggested false precision |
 | 7 | Shared assumptions builder for both exports | small | `engine/R/pipeline.R:105`, `engine/app.R:1199` | Fixed: `assumptions_report` in `engine/R/report.R`; contract echoed as its own sheet |
 | 8 | Truncated MLE for the lognormal body | medium | `engine/R/fit_severity.R:22` | Fixed: `fit_lnorm_truncated`; the `fitdistrplus` dependency was dropped |
 | 9 | Pareto small sample bias correction | small | `engine/R/fit_severity.R:2` | Implemented, then removed by decision (7 July 2026): judged unjustified complexity; the plain MLE stays and the limitation is accepted |
