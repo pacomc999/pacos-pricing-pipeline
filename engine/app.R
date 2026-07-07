@@ -479,11 +479,6 @@ ui <- shiny::fluidPage(
               condition = "input.sev_model == 'spliced'",
               shiny::numericInput("s", "Splice threshold (lognormal to Pareto)", value = NA),
               shiny::helpText("Pick where the tail begins. The plot updates live. Orange dashed line = splice threshold.")),
-            shiny::checkboxInput("bias_correct",
-              "Small-sample bias correction for the Pareto alpha", value = TRUE),
-            shiny::helpText("Multiplies the fitted alpha by (n - 1) / n to undo",
-              " the MLE's small-sample bias, which understates the tail.",
-              " Untick to reproduce the plain MLE."),
             shiny::uiOutput("sev_formula")),
           shiny::column(8,
             shiny::uiOutput("sev_body_warning"),
@@ -876,9 +871,7 @@ server <- function(input, output, session) {
   settings <- shiny::reactive({
     splice <- if (identical(input$sev_model, "spliced")) input$s else input$mt
     list(modelling_threshold = input$mt, splice_threshold = splice,
-         frequency_model = input$freq,
-         pareto_bias_correction = isTRUE(input$bias_correct),
-         n_simulations = input$nsim,
+         frequency_model = input$freq, n_simulations = input$nsim,
          loading_ev = input$load_ev, loading_sd = input$load_sd,
          var_level = input$var_level)
   })
@@ -1044,26 +1037,19 @@ server <- function(input, output, session) {
   output$sev_formula <- shiny::renderUI({
     name <- function(x) shiny::tags$span(class = "mf-name", x)
     line <- function(...) shiny::tags$div(...)
-    # The alpha estimator shown follows the bias correction checkbox.
-    alpha_txt <- if (isTRUE(input$bias_correct)) {
-      " α = (n - 1) / Σ ln(x / s)."
-    } else {
-      " α = n / Σ ln(x / s)."
-    }
     body <- if (identical(input$sev_model, "spliced")) {
       shiny::tagList(
         line(name("Lognormal body + Pareto tail")),
-        line("Body, MT < x ≤ s: lognormal(μ, σ) by truncated maximum",
-             " likelihood on (MT, s]."),
+        line("Body, MT < x ≤ s: lognormal(μ, σ) by maximum likelihood,",
+             " truncated to (MT, s]."),
         line("Tail, x > s: Pareto with lower bound x",shiny::tags$sub("0")," = s and",
-             alpha_txt),
+             " α = n / Σ ln(x / s)."),
         line("Tail Weight w = (number of losses above s) / (number above MT)."))
     } else {
       shiny::tagList(
         line(name("Single Pareto"),
              " (one heavy tail for all modelled losses; lower bound x",shiny::tags$sub("0")," = MT)"),
-        line("Survival S(t) = (t / MT)", shiny::tags$sup("−α"), ", with",
-             gsub("/ s", "/ MT", alpha_txt)))
+        line("Survival S(t) = (t / MT)", shiny::tags$sup("−α"), "."))
     }
     shiny::tags$div(class = "model-formula", body)
   })

@@ -14,15 +14,14 @@ test_that("run_pricing reproduces the notes Table 13 expected losses end to end"
     year = 2021:2025, inflation = rep(0, 5)))   # zero inflation to match Table 13
   openxlsx::addWorksheet(wb, "general inputs")
   # splice_threshold = modelling_threshold collapses the body, giving the pure
-  # Pareto model the notes use, so the result must match Table 13. The alpha
-  # bias correction is switched off because the notes use the plain MLE.
+  # Pareto model the notes use, so the result must match Table 13.
   openxlsx::writeData(wb, "general inputs", data.frame(
     key = c("modelling_threshold",
             "splice_threshold", "frequency_model", "n_simulations",
             "valuation_year", "loading_ev", "loading_sd", "var_level",
-            "reporting_threshold", "pareto_bias_correction"),
+            "reporting_threshold"),
     value = c("5", "5", "poisson", "200000", "2025",
-              "0.1", "0.2", "0.99", "2", "FALSE")))
+              "0.1", "0.2", "0.99", "2")))
   openxlsx::saveWorkbook(wb, path)
 
   # The contract is supplied by the caller (dashboard or, here, the test); it is
@@ -183,12 +182,8 @@ test_that("dashboard-style overrides drive a data-only workbook", {
   contract <- data.frame(
     deductible = c(5, 10, 20), cover = c(5, 10, 10),
     aad = 0, aal = 0)
-  # The bias correction is disabled through the override path here (the
-  # Table 13 test above disables it through the workbook), so both routes to
-  # the plain notes MLE are exercised.
   overrides <- list(modelling_threshold = 5, splice_threshold = 5,
                     frequency_model = "poisson", n_simulations = 200000,
-                    pareto_bias_correction = FALSE,
                     loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
   res <- run_pricing(path, overrides = overrides, contract = contract,
                      seed = 99)$results

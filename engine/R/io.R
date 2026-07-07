@@ -40,9 +40,6 @@ read_input <- function(path) {
   opt_chr <- function(k) {
     if (k %in% names(pv) && !is.na(pv[[k]])) pv[[k]] else NA_character_
   }
-  opt_lgl <- function(k) {
-    if (k %in% names(pv) && !is.na(pv[[k]])) as.logical(pv[[k]]) else NA
-  }
   parameters <- list(
     valuation_year      = as.integer(num("valuation_year")),
     # The loss size above which the data is complete (required). It bounds the
@@ -57,7 +54,6 @@ read_input <- function(path) {
     modelling_threshold = opt_num("modelling_threshold"),
     splice_threshold    = opt_num("splice_threshold"),
     frequency_model     = opt_chr("frequency_model"),
-    pareto_bias_correction = opt_lgl("pareto_bias_correction"),
     n_simulations       = opt_int("n_simulations"),
     loading_ev          = opt_num("loading_ev"),
     loading_sd          = opt_num("loading_sd"),

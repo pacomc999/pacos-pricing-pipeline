@@ -144,8 +144,7 @@ describe each field and is ignored by the reader):
 | `amount_units` | millions | no | labels the scale of the figures, e.g. millions |
 
 The workbook may optionally also carry modelling defaults (modelling threshold,
-splice threshold, frequency model, Pareto bias correction, simulations,
-loadings, VaR level). When
+splice threshold, frequency model, simulations, loadings, VaR level). When
 present they seed the dashboard controls. The precedence is: dashboard control
 overrides the workbook value, which overrides the built-in default (see
 `resolve_settings` in `pipeline.R`). When neither the dashboard nor the workbook
@@ -343,16 +342,14 @@ distribution is spliced at a higher point $s$ (the splice threshold):
   the windowed data would bias $\mu$ and $\sigma$, explaining the missing tails
   as low variance.
 - **Tail, for $X > s$:** a Pareto with lower bound $x_0 = s$ and shape $\alpha$
-  estimated by maximum likelihood with a small-sample bias correction:
+  estimated by maximum likelihood:
 
-$$ \hat\alpha = \frac{n - 1}{\sum_i \log(x_i / s)} $$
+$$ \hat\alpha = \frac{n}{\sum_i \log(x_i / s)} $$
 
-over the $n$ losses above $s$. The plain MLE $n / \sum_i \log(x_i / s)$ is
-biased upward (its expectation is $\alpha \cdot n / (n-1)$), which understates
-the tail exactly where reinsurance samples are thinnest; the $(n-1)/n$ factor
-removes that bias. The correction can be switched off in the dashboard (or via
-the `pareto_bias_correction` setting) to reproduce the plain MLE used in the
-Reinsurance Analytics notes; with a single tail loss the plain MLE is kept.
+over the $n$ losses above $s$, matching the estimator in the Reinsurance
+Analytics notes. (The MLE is known to be biased upward in small samples; a
+correction was considered and deliberately left out to keep the method simple
+and aligned with the notes.)
 
 - **Tail weight:** the empirical probability of being in the tail given a
   modelled loss,

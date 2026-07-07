@@ -13,6 +13,11 @@ uncertainty) stays open, as do the smaller suggestions not in the table
 sample size notes on the Model step). The technical premium wording and the
 multi-user hosting note were covered in the documentation pass.
 
+**Update, 7 July 2026:** item 9 (the Pareto alpha bias correction) was removed
+again by Francisco's decision: it added complexity he judged unjustified, and
+the plain MLE keeps the tool aligned with the Reinsurance Analytics notes. The
+finding in section 1.4 stands as a known, accepted limitation.
+
 ## Overall verdict
 
 This is a well built project. Several things stand out that professional pricing
@@ -260,5 +265,5 @@ assumptions sheets) is exactly where drift crept in.
 | 6 | Monte Carlo standard error in the validation table | small | `engine/R/report.R:23`, `engine/R/pipeline.R:86` | Fixed: `mc_se` in `engine/R/price.R`, new column in `validation_report` |
 | 7 | Shared assumptions builder for both exports | small | `engine/R/pipeline.R:105`, `engine/app.R:1199` | Fixed: `assumptions_report` in `engine/R/report.R`; contract echoed as its own sheet |
 | 8 | Truncated MLE for the lognormal body | medium | `engine/R/fit_severity.R:22` | Fixed: `fit_lnorm_truncated`; the `fitdistrplus` dependency was dropped |
-| 9 | Pareto small sample bias correction | small | `engine/R/fit_severity.R:2` | Fixed: (n - 1)/n by default; a dashboard checkbox and the `pareto_bias_correction` setting restore the plain MLE |
+| 9 | Pareto small sample bias correction | small | `engine/R/fit_severity.R:2` | Implemented, then removed by decision (7 July 2026): judged unjustified complexity; the plain MLE stays and the limitation is accepted |
 | 10 | Bootstrap parameter uncertainty, premium range per layer | large (headline v2 feature) | new module plus `engine/R/pipeline.R` | Open |
