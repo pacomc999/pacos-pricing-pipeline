@@ -40,10 +40,12 @@ version number, builds the zip, then opens the dist folder and the GitHub
 the zip into the page, click Publish release. No typed commands needed.
 
 The command line way, for anyone who prefers it:
-1. `.\engine\build_release.ps1 -Version x.y.z` builds a trimmed, end-user-only
-   zip at `dist/pacos-pricing-pipeline-vx.y.z.zip` (dev-only files like
-   tests/, this CLAUDE.md, and the docs source are left out on purpose; it
-   prints the exact `gh release create` command to run next).
+1. `.\engine\build_release_internal.ps1 -Version x.y.z` builds a trimmed,
+   end-user-only zip at `dist/pacos-pricing-pipeline-vx.y.z.zip` (dev-only
+   files like tests/, this CLAUDE.md, and the docs source are left out on
+   purpose; it prints the exact `gh release create` command to run next).
+   It is named "_internal" so it is not the file to double click, that is
+   build_release.bat, which calls this script for you.
 2. Run the `gh release create` command it prints. This is a deliberate,
    user-run step, never automated, since publishing a release is
    visible to others and not easily undone.

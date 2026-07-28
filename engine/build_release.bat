@@ -1,7 +1,8 @@
 @echo off
-REM Double click version of build_release.ps1, for when you would rather not
-REM type a PowerShell command. Asks for a version number, builds the zip,
-REM then opens the folder and the GitHub page so publishing is just clicking.
+REM Double click version of build_release_internal.ps1, for when you would
+REM rather not type a PowerShell command. Asks for a version number, builds
+REM the zip, then opens the folder and the GitHub page so publishing is just
+REM clicking. This is the file to double click, not the _internal.ps1 one.
 
 setlocal enableextensions
 cd /d "%~dp0"
@@ -15,7 +16,7 @@ if "%VERSION%"=="" (
 
 echo.
 echo Building the release zip for version %VERSION% ...
-powershell -NoProfile -ExecutionPolicy Bypass -File "build_release.ps1" -Version "%VERSION%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "build_release_internal.ps1" -Version "%VERSION%"
 if errorlevel 1 (
   echo.
   echo Something went wrong building the zip. Scroll up to see the error message.

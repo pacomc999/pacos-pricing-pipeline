@@ -5,8 +5,10 @@
 # documentation.docx. Dev-only material (tests, this script, CLAUDE.md, the
 # markdown source the docx is built from) is left out on purpose.
 #
-# USAGE (from anywhere):
-#   .\engine\build_release.ps1 -Version 1.1.0
+# Named "_internal" so it is clear this is not the file to double click,
+# use build_release.bat for that. This script is the real logic behind it,
+# and can also be run directly if you prefer typing a command:
+#   .\engine\build_release_internal.ps1 -Version 1.1.0
 #
 # This only builds the zip. It does not publish anything, since creating a
 # public GitHub Release is a one-way, visible-to-others action you should
