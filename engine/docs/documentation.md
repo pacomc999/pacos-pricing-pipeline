@@ -128,12 +128,17 @@ No commands and no R knowledge are required. If `.vbs`/`.bat` files are blocked
 on the machine, open `Start in RStudio.R` in RStudio and click Source instead;
 it does the same job through R rather than a script file.
 
-The rest of this section is for developers and advanced use only. These commands
-all run from inside the `engine/` folder:
+The rest of this section is for developers and advanced use only, and needs
+the full source repository, not the release zip, since the release zip only
+ships what an end user needs to run the tool and leaves out the test suite
+and other developer-only files. These commands all run from inside the
+`engine/` folder:
 
 - **Launch the dashboard:** `Rscript -e "shiny::runApp('.')"` (or open `app.R`
   in RStudio and click Run App).
-- **Run the test suite:** `Rscript run_tests.R`.
+- **Run the test suite:** `Rscript run_tests.R` (requires the `testthat`
+  package, and the `engine/tests/` folder, which is only in the source
+  repository).
 - **Price a workbook without the UI:** source `app.R` (which loads every module)
   then call `run_pricing("../input.xlsx", overrides = list(...))`.
 - **Regenerate the example workbook:** `Rscript make_example.R`.
