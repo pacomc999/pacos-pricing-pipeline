@@ -32,7 +32,14 @@ and click Source. All commands below run from inside this `engine/` folder:
 
 ## Releasing a new version
 End users get the tool as a zip attached to a GitHub Release, not a zip
-committed into the repo. To cut a release:
+committed into the repo.
+
+**Easiest way, double click `engine\build_release.bat`.** It asks for a
+version number, builds the zip, then opens the dist folder and the GitHub
+"new release" page for you. From there it is just: write a short note, drag
+the zip into the page, click Publish release. No typed commands needed.
+
+The command line way, for anyone who prefers it:
 1. `.\engine\build_release.ps1 -Version x.y.z` builds a trimmed, end-user-only
    zip at `dist/pacos-pricing-pipeline-vx.y.z.zip` (dev-only files like
    tests/, this CLAUDE.md, and the docs source are left out on purpose; it
