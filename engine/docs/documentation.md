@@ -134,13 +134,13 @@ ships what an end user needs to run the tool and leaves out the test suite
 and other developer-only files. These commands all run from inside the
 `engine/` folder:
 
-- **Launch the dashboard:** `Rscript -e "shiny::runApp('.')"` (or open `app.R`
-  in RStudio and click Run App).
+- **Launch the dashboard:** `Rscript -e "shiny::runApp('.', launch.browser = TRUE)"`
+  (or open `app.R` in RStudio and click Run App). `launch.browser = TRUE` is
+  needed here because Shiny only opens a browser tab on its own in an
+  interactive session, and `Rscript` is not interactive.
 - **Run the test suite:** `Rscript run_tests.R` (requires the `testthat`
   package, and the `engine/tests/` folder, which is only in the source
   repository).
-- **Price a workbook without the UI:** source `app.R` (which loads every module)
-  then call `run_pricing("../input.xlsx", overrides = list(...))`.
 - **Regenerate the example workbook:** `Rscript make_example.R`.
 
 ## Input workbook format

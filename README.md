@@ -68,16 +68,6 @@ Run these from inside the `engine` folder:
 4. Launch the dashboard: `Rscript -e "shiny::runApp('.', launch.browser = TRUE)"`
 5. Upload `input.xlsx`, set the thresholds on the Model step, then click Run pricing.
 
-## Pricing without the UI
-From inside the `engine` folder:
-
-```r
-# Source app.R (it loads every R/ module), then call run_pricing.
-source("app.R")
-result <- run_pricing("../input.xlsx", output_path = "../output.xlsx", seed = 1)
-result$results
-```
-
 ## Input workbook
 The workbook holds the data only; the modelling choices and the contract
 structure are set in the dashboard. It has four sheets: `general inputs`,
@@ -107,4 +97,6 @@ Reinsurance Analytics notes (Section 2.8). See `engine/docs/documentation.md`
 for the full methodology.
 
 ## Tests
-From inside the `engine` folder: `Rscript run_tests.R`
+From inside the `engine` folder: `Rscript run_tests.R`. This needs the full
+source repository, not the release zip, since the release zip leaves out
+`engine/tests/` on purpose (see Getting the tool above).
