@@ -91,6 +91,14 @@ packages and then re-checks them. If a required package cannot be installed (for
 example, no internet or a corporate firewall), it prints a clear message
 explaining what to do rather than failing silently.
 
+Some company computers block script files (`.vbs` and `.bat`) outright, so
+double-clicking `start.vbs` does nothing. `Start in RStudio.R`, in the same top
+folder, is the fallback for that case: open it in RStudio and click Source (or
+press Ctrl+Shift+S). It does the same job as `start.vbs`, just launched through
+R itself rather than a script file, which those blocks do not touch. It finds
+the `engine` folder next to itself, installs any missing packages the same way
+`install_deps.R` does, and opens the dashboard in the browser.
+
 ## Project layout
 
 The project is split so end users see a clean top folder, while all the code
@@ -99,6 +107,7 @@ lives in `engine/`.
 | Path | Contents |
 |------|----------|
 | `start.vbs` | Double-click launcher; runs with no console window. |
+| `Start in RStudio.R` | Fallback launcher for when `.vbs`/`.bat` files are blocked; run from inside RStudio. |
 | `input.xlsx` | The example input workbook (styled to match the dashboard). |
 | `README.md` | Short orientation for the repository. |
 | `engine/` | All the code and tests. |
@@ -115,7 +124,9 @@ lives in `engine/`.
 user needs to do: it installs anything missing on the first run and opens the
 dashboard in the browser (see Installation and first run above).
 `engine\start.bat` does the same with a visible console, for troubleshooting.
-No commands and no R knowledge are required.
+No commands and no R knowledge are required. If `.vbs`/`.bat` files are blocked
+on the machine, open `Start in RStudio.R` in RStudio and click Source instead;
+it does the same job through R rather than a script file.
 
 The rest of this section is for developers and advanced use only. These commands
 all run from inside the `engine/` folder:

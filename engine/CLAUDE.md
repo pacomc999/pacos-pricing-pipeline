@@ -12,8 +12,9 @@ folder is kept locally and is not committed (third-party material).
 
 ## Running
 For end users: double-click `start.vbs` in the parent folder (no console window) or
-`engine\start.bat` (visible console, for troubleshooting). All commands below run from
-inside this `engine/` folder:
+`engine\start.bat` (visible console, for troubleshooting). If those are blocked by the
+machine, `Start in RStudio.R` in the parent folder is the fallback: open it in RStudio
+and click Source. All commands below run from inside this `engine/` folder:
 - Install dependencies once: `Rscript install_deps.R`
 - Run the test suite: `Rscript run_tests.R`
 - Launch the dashboard: `Rscript -e "shiny::runApp('.')"` (or open app.R in RStudio and click Run App)
@@ -22,11 +23,23 @@ inside this `engine/` folder:
 
 ## Layout
 - This project lives in `engine/`; the parent folder holds only `start.vbs`,
-  `input.xlsx`, and `README.md` so end users see a clean folder.
+  `Start in RStudio.R`, `input.xlsx`, `README.md`, and
+  `Technical documentation.docx` so end users see a clean folder.
 - R/ holds one module per responsibility (see docs/documentation.md).
 - tests/testthat/ holds one test file per module; helper-setup.R sources R/.
 - docs/documentation.md is the technical documentation; the Word copy at the repo root is generated from it by docs/build_docx.R (run that after editing, never hand-edit the .docx).
 - make_example.R writes the template one level up (../input.xlsx).
+
+## Releasing a new version
+End users get the tool as a zip attached to a GitHub Release, not a zip
+committed into the repo. To cut a release:
+1. `.\engine\build_release.ps1 -Version x.y.z` builds a trimmed, end-user-only
+   zip at `dist/pacos-pricing-pipeline-vx.y.z.zip` (dev-only files like
+   tests/, this CLAUDE.md, and the docs source are left out on purpose; it
+   prints the exact `gh release create` command to run next).
+2. Run the `gh release create` command it prints. This is a deliberate,
+   user-run step, never automated, since publishing a release is
+   visible to others and not easily undone.
 
 ## Conventions
 - R + Shiny only. No TypeScript.

@@ -6,7 +6,7 @@
 #
 # HOW TO USE:
 #   1. Open RStudio.
-#   2. File > Open File... and pick this file ("Run in RStudio.R").
+#   2. File > Open File... and pick this file ("Start in RStudio.R").
 #   3. Click the "Source" button at the top right of the editor (or press
 #      Ctrl+Shift+S). A browser tab opens with the dashboard.
 #   To stop the tool, click "Shut down" in the dashboard or close the browser tab.
@@ -15,7 +15,7 @@
 
 # Find the folder this file lives in, so we can reach the engine folder next to
 # it. This works both when the file is Sourced from the RStudio editor and when
-# it is run with source("Run in RStudio.R") from the console.
+# it is run with source("Start in RStudio.R") from the console.
 find_this_folder <- function() {
   # When run via source(), each call frame carries the file path in $ofile.
   for (i in rev(seq_len(sys.nframe()))) {

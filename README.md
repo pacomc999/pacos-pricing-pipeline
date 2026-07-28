@@ -3,6 +3,11 @@
 An R and Shiny tool that prices non-proportional reinsurance from a historical
 loss list. Excel in, Excel plus dashboard out.
 
+## Getting the tool
+Download the zip from the
+[Releases page](https://github.com/pacomc999/pacos-pricing-pipeline/releases)
+and extract it. Each release lists what changed since the last one.
+
 ## Easiest start (Windows)
 **Double-click `start.vbs`.** The dashboard opens in your browser with no
 console window. To stop the tool, click **Shut down** in the dashboard, or just
@@ -13,8 +18,14 @@ instead. It does exactly the same thing but shows a small console window (close
 it to stop the tool). `engine\start.bat` is also handy when you want to see
 progress or error messages directly.
 
-Everything else lives in the `engine` folder; the top level holds only
-`start.vbs`, your `input.xlsx`, and this README.
+If your company blocks **both** `.vbs` and `.bat` files, open **`Start in
+RStudio.R`** in RStudio instead and click **Source** (or press
+Ctrl+Shift+S). It runs the tool through R itself, which those blocks do not
+touch, and opens the same dashboard.
+
+Everything else lives in the `engine` folder; the top level holds only the
+launchers above, your `input.xlsx`, this README, and the compiled Technical
+documentation.docx.
 
 Both launchers find an existing R install automatically, whatever the version
 and wherever it lives, by checking:

@@ -10,3 +10,7 @@ Literature/
 
 # Office lock/owner files (created while a doc is open in Word/Excel).
 ~$*
+
+# Release builds (build_release.ps1); published as GitHub Release assets
+# instead of being committed.
+dist/
