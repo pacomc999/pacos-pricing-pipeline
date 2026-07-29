@@ -13,21 +13,15 @@ and extract it. Each release lists what changed since the last one.
 console window. To stop the tool, click **Shut down** in the dashboard, or just
 close the browser tab (it shuts itself down automatically a few seconds later).
 
-If your company blocks `.vbs` files, double-click **`engine\start.bat`**
-instead. It does exactly the same thing but shows a small console window (close
-it to stop the tool). `engine\start.bat` is also handy when you want to see
-progress or error messages directly.
+If your company blocks `.vbs` files, open **`Start in RStudio.R`** in RStudio
+instead and click **Source** (or press Ctrl+Shift+S). It runs the tool through
+R itself, which those blocks do not touch, and opens the same dashboard.
 
-If your company blocks **both** `.vbs` and `.bat` files, open **`Start in
-RStudio.R`** in RStudio instead and click **Source** (or press
-Ctrl+Shift+S). It runs the tool through R itself, which those blocks do not
-touch, and opens the same dashboard.
+Everything else lives in the `engine` folder; the top level holds only
+`start.vbs`, `Start in RStudio.R`, your `input.xlsx`, this README, and the
+compiled Technical documentation.docx.
 
-Everything else lives in the `engine` folder; the top level holds only the
-launchers above, your `input.xlsx`, this README, and the compiled Technical
-documentation.docx.
-
-Both launchers find an existing R install automatically, whatever the version
+`start.vbs` finds an existing R install automatically, whatever the version
 and wherever it lives, by checking:
 1. a `R_PATH.txt` file in the `engine` folder, if present (see below),
 2. `Rscript` on the PATH,
@@ -35,13 +29,11 @@ and wherever it lives, by checking:
 4. the usual folders (`Program Files\R`, `Program Files (x86)\R`, and the
    per-user `Local\Programs\R`), newest version first.
 
-They then install the package dependencies (first run only), generate the
-top-level `input.xlsx` template, and open the dashboard. Loss data stays on the
-machine and is never uploaded anywhere. (`engine\start.bat` is pure batch with no
-PowerShell, so it runs on locked-down machines; `start.vbs` uses Windows Script
-Host purely to hide the console.)
+It then installs the package dependencies (first run only), generates the
+top-level `input.xlsx` template, and opens the dashboard. Loss data stays on the
+machine and is never uploaded anywhere.
 
-R must already be installed (the launchers do not install it, since company
+R must already be installed (`start.vbs` does not install it, since company
 machines often block installers). If R cannot be found, either install R from
 https://cran.r-project.org or, when R sits in an unusual location, create a file
 named `R_PATH.txt` in the `engine` folder containing the full path to
@@ -52,13 +44,13 @@ D:\Tools\R\R-4.5.2\bin\Rscript.exe
 ```
 
 If the required R packages cannot be installed (for example the company network
-blocks CRAN), the tool does not launch into a cryptic error: `start.bat` prints
-a plain-English message naming the missing packages, and `start.vbs` shows the
-same message in a popup. To use an internal CRAN mirror, create a file named
-`CRAN_MIRROR.txt` in the `engine` folder containing the mirror URL, then run the
-launcher again. The packages used are `shiny`, `readxl`, and `openxlsx` (plus
-`later`, which ships with shiny). All are available as ready-built Windows
-binaries on CRAN, so no compiler is needed.
+blocks CRAN), the tool does not fail with a cryptic error: `start.vbs` shows a
+plain-English popup naming the missing packages (`Start in RStudio.R` shows the
+same message as a red error in the R console instead). To use an internal CRAN
+mirror, create a file named `CRAN_MIRROR.txt` in the `engine` folder containing
+the mirror URL, then run the launcher again. The packages used are `shiny`,
+`readxl`, and `openxlsx` (plus `later`, which ships with shiny). All are
+available as ready-built Windows binaries on CRAN, so no compiler is needed.
 
 ## Quick start (any platform, command line)
 Run these from inside the `engine` folder:

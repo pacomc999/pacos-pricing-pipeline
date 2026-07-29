@@ -83,15 +83,14 @@ Back and Next buttons walk the linear path. Nothing is gated.
 
 For an end user the simplest path is to double-click `start.vbs` in the top
 folder. It runs with no console window and opens the dashboard in the default
-browser. `engine\start.bat` does the same with a visible console, which is
-useful for troubleshooting.
+browser.
 
 On first run the launcher calls `install_deps.R`, which installs any missing
 packages and then re-checks them. If a required package cannot be installed (for
 example, no internet or a corporate firewall), it prints a clear message
 explaining what to do rather than failing silently.
 
-Some company computers block script files (`.vbs` and `.bat`) outright, so
+Some company computers block script files (`.vbs`) outright, so
 double-clicking `start.vbs` does nothing. `Start in RStudio.R`, in the same top
 folder, is the fallback for that case: open it in RStudio and click Source (or
 press Ctrl+Shift+S). It does the same job as `start.vbs`, just launched through
@@ -107,7 +106,7 @@ lives in `engine/`.
 | Path | Contents |
 |------|----------|
 | `start.vbs` | Double-click launcher; runs with no console window. |
-| `Start in RStudio.R` | Fallback launcher for when `.vbs`/`.bat` files are blocked; run from inside RStudio. |
+| `Start in RStudio.R` | Fallback launcher for when `.vbs` files are blocked; run from inside RStudio. |
 | `input.xlsx` | The example input workbook (styled to match the dashboard). |
 | `README.md` | Short orientation for the repository. |
 | `engine/` | All the code and tests. |
@@ -123,8 +122,7 @@ lives in `engine/`.
 **The everyday way is to just double-click `start.vbs`.** That is all an end
 user needs to do: it installs anything missing on the first run and opens the
 dashboard in the browser (see Installation and first run above).
-`engine\start.bat` does the same with a visible console, for troubleshooting.
-No commands and no R knowledge are required. If `.vbs`/`.bat` files are blocked
+No commands and no R knowledge are required. If `.vbs` files are blocked
 on the machine, open `Start in RStudio.R` in RStudio and click Source instead;
 it does the same job through R rather than a script file.
 
