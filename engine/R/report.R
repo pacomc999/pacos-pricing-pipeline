@@ -25,7 +25,7 @@ assumptions_report <- function(settings, parameters, fits, seed = NA) {
   sev <- fits$fit_severity
   lnorm_mu <- if (is.null(sev$lnorm)) NA_real_ else sev$lnorm$meanlog
   lnorm_sd <- if (is.null(sev$lnorm)) NA_real_ else sev$lnorm$sdlog
-  data.frame(
+  out <- data.frame(
     key = c("valuation_year", "currency", "amount_units", "last_complete_year",
             "modelling_threshold", "splice_threshold", "frequency_model",
             "expected_claims_per_year", "pareto_alpha",
@@ -40,6 +40,18 @@ assumptions_report <- function(settings, parameters, fits, seed = NA) {
       round(lnorm_mu, 4), round(lnorm_sd, 4), round(sev$weight, 4),
       settings$n_simulations, settings$loading_ev, settings$loading_sd,
       settings$var_level, seed)))
+  # The Binomial rests on an assumption the user confirmed in the dashboard:
+  # the exposure is the number of insured risks. Record it with N and p, so
+  # anyone reading the file sees what the frequency was built on.
+  fq <- fits$fit_frequency
+  if (identical(fq$type, "binomial")) {
+    out <- rbind(out, data.frame(
+      key = c("exposure_basis", "binomial_risks_N", "binomial_p"),
+      value = c("number of insured risks (confirmed by the user)",
+                as.character(fq$params$size),
+                as.character(signif(fq$params$prob, 4)))))
+  }
+  out
 }
 
 # The validation table: simulated against closed-form expected loss, their delta,

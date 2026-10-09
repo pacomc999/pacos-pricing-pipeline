@@ -122,3 +122,46 @@ test_that("unit_label joins currency and units, dropping whatever is missing", {
   expect_equal(unit_label(NULL, NULL), "")
   expect_equal(unit_label("", "millions"), "millions")
 })
+
+test_that("assumptions_report records the Binomial exposure assumption, N and p", {
+  settings <- list(modelling_threshold = 5, splice_threshold = 5,
+                   frequency_model = "binomial", n_simulations = 1000L,
+                   loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99)
+  parameters <- list(valuation_year = 2026L, currency = NA, amount_units = NA,
+                     last_complete_year = NA_integer_)
+  fits <- list(fit_frequency = fit_binomial_risks(c(1, 2), c(10, 10), 12),
+               fit_severity = list(mt = 5, s = 5, weight = 1, lnorm = NULL,
+                                   pareto = list(x0 = 5, alpha = 1.5)))
+  tbl <- assumptions_report(settings, parameters, fits)
+  get <- function(k) tbl$value[tbl$key == k]
+  expect_match(get("exposure_basis"), "number of insured risks")
+  expect_equal(get("binomial_risks_N"), "12")
+  expect_equal(get("binomial_p"), "0.15")
+  # Other models do not carry the Binomial rows.
+  fits$fit_frequency <- fit_frequency(c(1, 2), "poisson")
+  expect_false("exposure_basis" %in% assumptions_report(settings, parameters, fits)$key)
+})
+
+test_that("the dashboard only prices a Binomial once the exposure is confirmed", {
+  # A workbook whose exposure counts risks (whole numbers, valuation year present).
+  path <- tempfile(fileext = ".xlsx")
+  wb <- build_template_workbook()
+  openxlsx::writeData(wb, "exposure",
+    data.frame(year = 2021:2026, exposure = c(8, 8, 9, 9, 10, 12)))
+  openxlsx::saveWorkbook(wb, path, overwrite = TRUE)
+  app <- shiny::shinyApp(ui, server)
+  shiny::testServer(app, {
+    session$setInputs(file = list(datapath = path, name = "risks.xlsx"))
+    session$setInputs(mt = 5, freq = "binomial", sev_model = "single", s = NA,
+                      nsim = 2000, load_ev = 0.1, load_sd = 0.2,
+                      var_level = 0.99, seed = 1, binomial_confirm = FALSE)
+    session$setInputs(run = 1)
+    # Unconfirmed: pricing stops with the confirmation message.
+    expect_error(priced(), "number of insured risks")
+    # Confirmed: it prices, with N taken from the valuation-year exposure.
+    session$setInputs(binomial_confirm = TRUE)
+    session$setInputs(run = 2)
+    expect_equal(priced()$fits$fit_frequency$params$size, 12L)
+    expect_true(all(priced()$results$expected_loss >= 0))
+  })
+})

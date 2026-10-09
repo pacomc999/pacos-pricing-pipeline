@@ -260,3 +260,26 @@ test_that("resolve_settings defaults the modelling threshold to the reporting th
   expect_equal(
     resolve_settings(params_mt, overrides = list(modelling_threshold = 4))$modelling_threshold, 4)
 })
+
+test_that("fit_models fits the Binomial on an exposure that counts risks", {
+  # A small book of insured buildings: the exposure is the number of risks.
+  input <- list(
+    losses = data.frame(year = c(2021, 2023, 2024, 2024, 2025),
+                        loss = c(12, 18, 13, 11, 14)),
+    exposure = data.frame(year = 2021:2026, exposure = c(8, 8, 9, 9, 10, 12)),
+    inflation = data.frame(year = 2021:2026, inflation = 0),
+    parameters = list(valuation_year = 2026L, reporting_threshold = 2,
+                      last_complete_year = 2025L))
+  settings <- list(modelling_threshold = 5, splice_threshold = 5,
+                   frequency_model = "binomial")
+  fits <- fit_models(input, settings)
+  fq <- fits$fit_frequency
+  expect_equal(fits$counts, c(1, 0, 1, 2, 1))
+  expect_equal(fq$params$size, 12L)               # valuation-year risks
+  expect_equal(fq$params$prob, 5 / 44)            # claims / risk-years
+  expect_equal(fq$expected, 12 * 5 / 44)
+
+  # The same workbook with a monetary looking exposure stops with a message.
+  input$exposure$exposure <- c(8.5, 8, 9, 9, 10, 12)
+  expect_error(fit_models(input, settings), "not whole numbers")
+})

@@ -226,7 +226,7 @@ modules; it contains no pricing mathematics of its own.
 | `io.R` | read the input workbook, write the output workbook |
 | `layers.R` | the per-loss layer function and the default program |
 | `preprocess.R` | inflation indexation, exposure scaling, burning cost |
-| `fit_frequency.R` | fit and scale Poisson, Negative Binomial or Binomial |
+| `fit_frequency.R` | fit and scale Poisson or Negative Binomial; fit the Binomial on a count of risks |
 | `fit_severity.R` | fit the spliced lognormal and Pareto, survival, sampler |
 | `simulate.R` | Monte Carlo of annual ground-up losses |
 | `price.R` | apply the layers, compute premiums and risk metrics |
@@ -335,13 +335,42 @@ Let $m$ be the mean and $v$ the variance of the annual counts.
 
 - **Poisson.** $\hat\lambda = m$.
 - **Negative Binomial** (only when $v > m$, that is, over-dispersion). Method of
-  moments: size $r = m^2 / (v - m)$ with mean $\mu = m$.
-- **Binomial** (only when $v < m$, that is, under-dispersion). Method of moments:
-  $p = 1 - v/m$ and number of trials $n = \mathrm{round}(m / p)$.
+  moments: size $r = m^2 / (v - m)$ with mean $\mu = m$. It needs at least two
+  observed years.
+- **Binomial**, for a book of countable independent risks only. The number of
+  trials is never estimated from the counts: with both $n$ and $p$ unknown the
+  estimate is unstable (as $v$ approaches $m$ it runs off to infinity), and it
+  moves the support of the distribution with the noise in a few years of data.
+  Instead the exposure is read as the number of insured risks $N_t$ in each
+  observed year $t$, and each risk produces at most one loss above MT per year
+  with probability $p$, so the count is $\mathrm{Binomial}(N_t, p)$. The maximum
+  likelihood estimate is the pooled rate
+  $\hat p = \sum_t k_t \big/ \sum_t N_t$ (claims over risk-years), and the
+  forward count is $\mathrm{Binomial}(N_V, \hat p)$ with $N_V$ the valuation-year
+  exposure (`fit_binomial_risks`). The fit stops with a plain message when the
+  exposure cannot be a count of risks: a value that is not a whole number, a
+  year with more claims than risks, or no valuation-year row.
 
-The fitted mean is then scaled to the prospective book by the frequency factor
-$f^{freq}$ above (`scale_frequency`): Poisson and Negative Binomial scale their
-mean parameter directly, Binomial scales the number of trials.
+Because the tool cannot tell a count of risks from a monetary exposure by
+looking at the numbers (150 buildings and 150 million of premium look the
+same), the dashboard shows a prominent notice when the Binomial is selected,
+with the live $N$ and $\hat p$, and the model is only used once the user ticks
+"My exposure is the number of insured risks". The confirmation resets when a
+new workbook is uploaded, and the assumptions sheet of the export records it
+together with $N$ and $\hat p$. A monetary exposure in large units would give
+a huge $N$ and a tiny $p$, which behaves almost exactly like a Poisson; the
+harmful case is a monetary exposure that happens to be a small number, which
+would cap the yearly count at that number.
+
+The Poisson and Negative Binomial means are then scaled to the prospective book
+by the frequency factor $f^{freq}$ above (`scale_frequency`). The Binomial needs
+no scaling, since its number of trials is already the forward number of risks;
+the pooled estimate gives the same expected count as scaling the Poisson
+($\hat p \, N_V$), with the extra structure that no year can exceed $N_V$ claims.
+The Model step's frequency plot compares the empirical counts with the fit on
+the observed basis: for the Binomial that is the average of
+$\mathrm{Binomial}(N_t, \hat p)$ over the observed years
+(`observed_frequency_pmf`).
 
 ## Severity model: spliced lognormal and Pareto
 

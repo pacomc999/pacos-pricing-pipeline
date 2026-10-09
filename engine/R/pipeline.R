@@ -61,9 +61,18 @@ fit_models <- function(input, settings) {
     years, settings$modelling_threshold)
   # Frequency is the observed-period rate, scaled to the prospective book: a
   # larger forward exposure is expected to produce proportionally more claims.
-  freq <- fit_frequency(counts, settings$frequency_model)
-  freq <- scale_frequency(freq, exposure_frequency_factor(
-    input$exposure, years, input$parameters$valuation_year))
+  # The Binomial reads the exposure as the number of insured risks: its number
+  # of trials is the forward number of risks, so it needs no scaling.
+  if (settings$frequency_model == "binomial") {
+    expo <- input$exposure
+    freq <- fit_binomial_risks(counts,
+      expo$exposure[match(years, expo$year)],
+      expo$exposure[expo$year == input$parameters$valuation_year])
+  } else {
+    freq <- fit_frequency(counts, settings$frequency_model)
+    freq <- scale_frequency(freq, exposure_frequency_factor(
+      input$exposure, years, input$parameters$valuation_year))
+  }
   sev <- fit_severity(losses$loss_indexed,
                       settings$modelling_threshold, settings$splice_threshold)
   list(losses = losses, years = years, counts = counts,

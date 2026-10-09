@@ -209,6 +209,14 @@ app_css <- shiny::tags$style(shiny::HTML("
   .run-prompt { background: #eef4fc; border: 1px solid var(--accent);
     border-left: 4px solid var(--accent); border-radius: 6px;
     padding: 18px 20px; color: var(--navy-mid); }
+  /* Binomial notice: the exposure must be a count of risks. Amber like the other
+     cautions, with a heavier border and title so it cannot be missed. */
+  .binomial-notice { background: #fff7e6; border: 2px solid #d98324;
+    border-radius: 6px; padding: 12px 14px; margin: 4px 0 10px;
+    color: #5c3a0c; font-size: 13px; }
+  .binomial-notice .bn-title { font-weight: 700; font-size: 15px;
+    color: #7a4f12; margin-bottom: 6px; }
+  .binomial-notice ul { padding-left: 18px; margin: 6px 0; }
   .run-prompt-title { font-weight: 700; font-size: 18px;
     color: var(--navy-deep); margin-bottom: 6px; }
 
@@ -411,7 +419,9 @@ ui <- shiny::fluidPage(
           " (frequency) and how big they are (severity)."),
         shiny::tags$ul(
           shiny::tags$li(shiny::tags$strong("Frequency model"),
-            ": how the yearly count of losses is distributed (Poisson, Negative Binomial or Binomial)."),
+            ": how the yearly count of losses is distributed (Poisson, Negative Binomial or Binomial).",
+            " The Binomial is only for a book of countable independent risks: it reads the exposure",
+            " as the number of insured risks and asks you to confirm that before it is used."),
           shiny::tags$li(shiny::tags$strong("Severity model"),
             ": how the loss sizes are distributed. Choose a single Pareto (the default), or a lognormal body for ordinary losses spliced onto a Pareto tail for the large ones."),
           shiny::tags$li(shiny::tags$strong("Modelling threshold (MT)"),
@@ -442,22 +452,34 @@ ui <- shiny::fluidPage(
       # Frequency calibration: the model choice and its fitted summary.
       calib_card("Frequency calibration",
         shiny::tags$p("The frequency is the number of losses above the modelling",
-          " threshold in a year, N. We fit it by the method of moments from the",
-          " yearly counts, then scale the expected number to the book being priced",
-          " by the exposure factor f = E",
+          " threshold in a year, N. Poisson and Negative Binomial are fitted to the",
+          " yearly counts (the Negative Binomial by the method of moments), then",
+          " the expected number is scaled to the book being priced by the exposure",
+          " factor f = E",
           shiny::tags$sub("V"), " / mean(E", shiny::tags$sub("obs"), "), where E",
           shiny::tags$sub("V"), " is the valuation-year exposure and the average",
-          " runs over the observed years (the exposure years up to the latest loss",
-          " year). This is the same as taking the claims-per-exposure rate over the",
-          " observed years and applying it to the forward book, so a larger forward",
-          " book gives proportionally more claims."),
+          " runs over the observed years (the exposure years up to the last complete",
+          " year, or the latest loss year when none is given). This is the same as",
+          " taking the claims-per-exposure rate over the observed years and applying",
+          " it to the forward book, so a larger forward book gives proportionally",
+          " more claims. The Binomial instead reads the exposure as the number of",
+          " insured risks, as its notice explains."),
         shiny::fluidRow(
           shiny::column(4,
             shiny::selectInput("freq", "Frequency model",
                                choices = c("Poisson" = "poisson",
                                            "Negative Binomial" = "negbin",
                                            "Binomial" = "binomial"),
-                               selected = "poisson")),
+                               selected = "poisson"),
+            # The Binomial reads the exposure as the number of insured risks.
+            # Shown loudly, and it must be confirmed before the model is used,
+            # since a monetary exposure would silently become a number of trials.
+            shiny::conditionalPanel(
+              condition = "input.freq == 'binomial'",
+              shiny::uiOutput("binomial_notice"),
+              shiny::checkboxInput("binomial_confirm",
+                shiny::tags$strong("My exposure is the number of insured risks"),
+                value = FALSE))),
           shiny::column(8,
             shiny::plotOutput("freq_plot"),
             shiny::tableOutput("freq_summary")))
@@ -814,6 +836,8 @@ server <- function(input, output, session) {
       selected = if (!is.na(st$splice_threshold) &&
                      st$splice_threshold > st$modelling_threshold) "spliced" else "single")
     shiny::updateSelectInput(session, "freq", selected = st$frequency_model)
+    # The confirmation is about this workbook's exposure, so a new upload asks again.
+    shiny::updateCheckboxInput(session, "binomial_confirm", value = FALSE)
     shiny::updateNumericInput(session, "nsim", value = st$n_simulations)
     shiny::updateNumericInput(session, "load_ev", value = st$loading_ev)
     shiny::updateNumericInput(session, "load_sd", value = st$loading_sd)
@@ -871,8 +895,19 @@ server <- function(input, output, session) {
     list(modelling_threshold = input$mt, splice_threshold = splice,
          frequency_model = input$freq, n_simulations = input$nsim,
          loading_ev = input$load_ev, loading_sd = input$load_sd,
-         var_level = input$var_level)
+         var_level = input$var_level,
+         binomial_confirmed = isTRUE(input$binomial_confirm))
   })
+
+  # Stops a frequency output or the pricing with a plain message until the
+  # user confirms that the exposure is the number of insured risks. Only the
+  # Binomial needs it; the other models pass straight through.
+  need_binomial_confirmed <- function() {
+    shiny::validate(shiny::need(
+      !identical(input$freq, "binomial") || isTRUE(input$binomial_confirm),
+      paste("Confirm that the exposure is the number of insured risks",
+            "(tick box under the frequency model) to use the Binomial.")))
+  }
 
   # Fast fit (no simulation): drives the Fit tab and updates as thresholds change.
   fits <- shiny::reactive({
@@ -953,16 +988,20 @@ server <- function(input, output, session) {
   # (unscaled), so it shares a basis with the empirical bars instead of the
   # forward-scaled pricing fit.
   output$freq_plot <- shiny::renderPlot(bg = "#f4f7fc", {
+    need_binomial_confirmed()
     f <- fits()
     counts <- f$counts
-    fq <- fit_frequency(counts, f$fit_frequency$type)
+    # The Binomial fit is already on the observed basis (one N per observed
+    # year); the others are refit on the observed counts, unscaled.
+    fq <- if (f$fit_frequency$type == "binomial") f$fit_frequency
+          else fit_frequency(counts, f$fit_frequency$type)
     # x range: cover the observed counts and the fitted upper tail.
     kmax <- max(counts)
-    while (sum(frequency_pmf(fq, 0:kmax)) < 0.999 && kmax < 200) kmax <- kmax + 1
+    while (sum(observed_frequency_pmf(fq, 0:kmax)) < 0.999 && kmax < 200) kmax <- kmax + 1
     ks <- 0:kmax
     # Empirical mass = fraction of observed years with each count.
     emp_pmf <- as.numeric(table(factor(counts, levels = ks))) / length(counts)
-    mat <- rbind(Empirical = emp_pmf, Fitted = frequency_pmf(fq, ks))
+    mat <- rbind(Empirical = emp_pmf, Fitted = observed_frequency_pmf(fq, ks))
     ymax <- max(mat) * 1.1
     # First pass draws invisible bars to set up the axes and bar positions; then
     # paint the panel white and redraw the bars on top, so only the margins keep
@@ -979,10 +1018,41 @@ server <- function(input, output, session) {
            fill = c("grey70", "#2f6fd0"), border = NA, bty = "n")
   })
 
+  # The Binomial notice: what the model assumes, and the N and p it will use,
+  # filled in live from the data so the user sees exactly what is being fitted.
+  # The fit can stop (e.g. an exposure that is not a whole number); the notice
+  # then shows that message in place of the figures.
+  output$binomial_notice <- shiny::renderUI({
+    fq <- tryCatch(fits()$fit_frequency, error = function(e) conditionMessage(e))
+    figures <- if (is.list(fq) && identical(fq$type, "binomial")) {
+      shiny::tags$ul(
+        shiny::tags$li("N = valuation-year exposure = ",
+                       shiny::tags$strong(fq$params$size, " risks")),
+        shiny::tags$li("p = claims / risk-years over the observed years = ",
+                       sum(fits()$counts), " / ", sum(fq$risks_obs), " = ",
+                       shiny::tags$strong(format(signif(fq$params$prob, 3)))))
+    } else if (is.character(fq) && nzchar(fq)) {
+      shiny::tags$p(shiny::tags$strong(fq))
+    }
+    shiny::tags$div(class = "binomial-notice",
+      shiny::tags$div(class = "bn-title",
+        "Binomial: the exposure must be the number of insured risks."),
+      shiny::tags$div("The exposure sheet is read as the number of independent",
+        " risks (buildings, vessels, sites) in each year, and each risk is",
+        " assumed to produce at most one loss above the modelling threshold",
+        " per year. N comes from the exposure and only p is calibrated from",
+        " the data."),
+      figures,
+      shiny::tags$div(shiny::tags$strong("If your exposure is premium, sums",
+        " insured or any other monetary amount, this model is wrong."),
+        " Use Poisson or Negative Binomial instead."))
+  })
+
   # Frequency summary: the model, the forward expected claim count (exposure
   # scaled) and the historical basis it was scaled from. Updates live with MT and
   # the chosen frequency model.
   output$freq_summary <- shiny::renderTable({
+    need_binomial_confirmed()
     f <- fits()
     fq <- f$fit_frequency
     model_label <- c(poisson = "Poisson", negbin = "Negative Binomial",
@@ -999,9 +1069,9 @@ server <- function(input, output, session) {
       value <- c(value, format(round(p$size, 3)),
                  format(round(p$mu + p$mu^2 / p$size, 2)))
     } else if (fq$type == "binomial") {
-      quantity <- c(quantity, "Number of trials (n)", "Success probability (p)",
-                    "Implied variance")
-      value <- c(value, as.character(p$size), format(round(p$prob, 3)),
+      quantity <- c(quantity, "Insured risks, valuation year (N)",
+                    "Claim probability per risk (p)", "Implied variance")
+      value <- c(value, as.character(p$size), format(signif(p$prob, 3)),
                  format(round(p$size * p$prob * (1 - p$prob), 2)))
     }
     data.frame(Quantity = quantity, Value = value, check.names = FALSE)
@@ -1059,6 +1129,7 @@ server <- function(input, output, session) {
     ct <- contract()
     msg <- validate_contract(ct)
     shiny::validate(shiny::need(is.null(msg), msg))
+    need_binomial_confirmed()
     # Show a progress bar through the pricing phases; the Monte Carlo simulation
     # is the slow step, so the bar sits there the longest.
     shiny::withProgress(message = "Pricing", value = 0, {
