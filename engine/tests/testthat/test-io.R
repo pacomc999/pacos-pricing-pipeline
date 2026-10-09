@@ -177,6 +177,20 @@ test_that("read_input rejects inflation that does not cover the indexation span"
   expect_error(read_input(path), "inflation")
 })
 
+test_that("read_input requires inflation for observed exposure years before the first loss", {
+  # Exposure from 2019 but losses only from 2021: 2019 and 2020 are observed
+  # (zero-loss) years, so the reporting threshold is indexed from 2019 and
+  # needs the 2020 and 2021 rates. The inflation sheet starts in 2021, so the
+  # 2020 rate is missing; the Model step used to fail on it later.
+  path <- replace_sheet(write_tmp_workbook(), "exposure", data.frame(
+    year = 2019:2025, exposure = c(100, 110, 120, 120, 130, 140, 145)))
+  expect_error(read_input(path), "rate for year\\(s\\) 2020,")
+  # With the 2020 rate added, the same workbook loads.
+  path <- replace_sheet(path, "inflation", data.frame(
+    year = 2020:2026, inflation = c(0.01, 0.02, 0.03, 0.025, 0.04, 0.03, 0.035)))
+  expect_silent(read_input(path))
+})
+
 test_that("read_input warns about losses at or below the reporting threshold", {
   # A loss of 1.5 sits below the reporting threshold of 2: the data is declared
   # complete only above 2, so this is suspicious but not fatal.

@@ -165,3 +165,46 @@ test_that("the dashboard only prices a Binomial once the exposure is confirmed",
     expect_true(all(priced()$results$expected_loss >= 0))
   })
 })
+
+test_that("upload_error_ui lists each validation problem as a bullet", {
+  msg <- paste0("The input workbook has problems:\n",
+                "- The 'losses' sheet has loss amounts of 0 or less.\n",
+                "- The 'exposure' sheet lists the same year twice.")
+  html <- as.character(upload_error_ui("bad.xlsx", msg))
+  expect_match(html, "bad.xlsx could not be loaded")
+  expect_equal(lengths(regmatches(html, gregexpr("<li>", html))), 2)
+  expect_match(html, "<li>The 'exposure' sheet lists the same year twice.</li>",
+               fixed = TRUE)
+  # Any other error becomes a single bullet with its full message.
+  html <- as.character(upload_error_ui("x.xlsx", "Input workbook is missing required sheet(s): losses"))
+  expect_match(html, "<li>Input workbook is missing required sheet(s): losses</li>",
+               fixed = TRUE)
+})
+
+test_that("a workbook that fails validation is reported, not fatal, and clears old data", {
+  good <- tempfile(fileext = ".xlsx")
+  openxlsx::saveWorkbook(build_template_workbook(), good, overwrite = TRUE)
+  bad <- tempfile(fileext = ".xlsx")
+  wb <- build_template_workbook()
+  openxlsx::writeData(wb, "losses", data.frame(year = 2021, loss = -5),
+                      startRow = 2, colNames = FALSE)
+  openxlsx::saveWorkbook(wb, bad, overwrite = TRUE)
+  app <- shiny::shinyApp(ui, server)
+  shiny::testServer(app, {
+    # A good upload first, so there is old data that must not survive.
+    session$setInputs(file = list(datapath = good, name = "good.xlsx"))
+    expect_false(is.null(rv$data))
+    # The bad upload: no error escapes the observer (which would end the
+    # session), the message is kept, and the earlier data is gone.
+    expect_no_error(session$setInputs(file = list(datapath = bad, name = "bad.xlsx")))
+    expect_null(rv$data)
+    expect_null(.app_state$data)
+    expect_match(rv$error, "loss amounts of 0 or less")
+    expect_match(output$data_info$html, "bad.xlsx could not be loaded")
+    expect_error(input_data(), "could not be loaded")
+    # Uploading a fixed workbook clears the error and loads the data.
+    session$setInputs(file = list(datapath = good, name = "fixed.xlsx"))
+    expect_null(rv$error)
+    expect_equal(nrow(input_data()$losses), 7)
+  })
+})

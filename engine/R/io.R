@@ -117,9 +117,23 @@ validate_input <- function(losses, exposure, inflation, parameters) {
       "Loss year(s) ", paste(missing_expo, collapse = ", "),
       " have no row in the 'exposure' sheet."))
   }
-  # Indexation needs a rate for every year between the oldest loss (plus one)
-  # and the valuation year, in either direction.
-  yrs <- c(losses$year[!is.na(losses$year)], parameters$valuation_year)
+  # Indexation needs a rate for every year between the oldest year that gets
+  # indexed (plus one) and the valuation year, in either direction. That is
+  # the oldest loss, and also the oldest observed exposure year: the reporting
+  # threshold is indexed from every year in the observation window (exposure
+  # years up to the last complete year, or the latest loss year), which can
+  # start before the first loss.
+  loss_yrs <- losses$year[!is.na(losses$year)]
+  window_end <- if (!is.na(parameters$last_complete_year)) {
+    parameters$last_complete_year
+  } else if (length(loss_yrs) > 0) {
+    max(loss_yrs)
+  } else {
+    NA
+  }
+  obs_yrs <- exposure$year[!is.na(exposure$year) & !is.na(window_end) &
+                           exposure$year <= window_end]
+  yrs <- c(loss_yrs, obs_yrs, parameters$valuation_year)
   lo <- min(yrs); hi <- max(yrs)
   if (hi > lo) {
     missing_infl <- setdiff((lo + 1):hi, inflation$year)
@@ -127,7 +141,8 @@ validate_input <- function(losses, exposure, inflation, parameters) {
       problems <- c(problems, paste0(
         "The 'inflation' sheet is missing the rate for year(s) ",
         paste(missing_infl, collapse = ", "),
-        ", needed to revalue the losses to the valuation year."))
+        ", needed to revalue the losses and the reporting threshold to the",
+        " valuation year."))
     }
   }
   if (length(problems) > 0) {

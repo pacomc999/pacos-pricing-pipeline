@@ -96,6 +96,21 @@ unit_label <- function(currency, units) {
   paste(parts, collapse = " ")
 }
 
+# The red message shown on the Data step when an upload fails to load. The
+# validation error lists its problems as "- " lines after a heading line; each
+# becomes a bullet. Any other error (a missing sheet, a file that is not a
+# workbook) is shown as a single bullet (pure, unit-tested).
+upload_error_ui <- function(name, message) {
+  lines <- strsplit(message, "\n", fixed = TRUE)[[1]]
+  items <- sub("^- ", "", lines[grepl("^- ", lines)])
+  if (length(items) == 0) items <- message
+  shiny::tags$div(class = "upload-error",
+    shiny::tags$div(class = "ue-title",
+      paste0(name, " could not be loaded:")),
+    shiny::tags$ul(lapply(items, shiny::tags$li)),
+    shiny::tags$div("Fix the workbook and upload it again."))
+}
+
 # The on-screen results and validation tables are formatted by results_report()
 # and validation_report() in R/report.R, so the dashboard and the Excel report
 # always share one definition (same columns, order and names).
@@ -209,6 +224,12 @@ app_css <- shiny::tags$style(shiny::HTML("
   .run-prompt { background: #eef4fc; border: 1px solid var(--accent);
     border-left: 4px solid var(--accent); border-radius: 6px;
     padding: 18px 20px; color: var(--navy-mid); }
+  /* Upload error: red, since the workbook could not be loaded at all. */
+  .upload-error { background: #fdecec; border: 1px solid var(--error);
+    border-left: 4px solid var(--error); border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 12px; color: #7a1c1c; }
+  .upload-error .ue-title { font-weight: 700; margin-bottom: 4px; }
+  .upload-error ul { padding-left: 18px; margin: 4px 0 6px; }
   /* Binomial notice: the exposure must be a count of risks. Amber like the other
      cautions, with a heavier border and title so it cannot be missed. */
   .binomial-notice { background: #fff7e6; border: 2px solid #d98324;
@@ -739,14 +760,29 @@ server <- function(input, output, session) {
 
   # Initialise this session's data from the process-level store, so a refresh
   # comes back to the last upload.
-  rv <- shiny::reactiveValues(data = .app_state$data, name = .app_state$name)
+  rv <- shiny::reactiveValues(data = .app_state$data, name = .app_state$name,
+                              error = NULL)
 
   # On upload, read the workbook and remember it for this session and the process.
+  # A workbook that fails validation must not reach an uncaught error here: an
+  # error inside an observer ends the browser session, and the self-shutdown
+  # then stops the tool. Instead the message is kept and shown on the Data step.
+  # A failed upload also clears any earlier data, so nobody prices an old
+  # workbook believing it is the one they just uploaded.
   shiny::observeEvent(input$file, {
-    rv$data <- read_input(input$file$datapath)
-    rv$name <- input$file$name
+    loaded <- tryCatch(read_input(input$file$datapath),
+                       error = function(e) e)
+    if (inherits(loaded, "error")) {
+      rv$data <- NULL
+      rv$name <- input$file$name
+      rv$error <- conditionMessage(loaded)
+    } else {
+      rv$data <- loaded
+      rv$name <- input$file$name
+      rv$error <- NULL
+    }
     .app_state$data <- rv$data
-    .app_state$name <- rv$name
+    .app_state$name <- if (is.null(rv$data)) NULL else rv$name
   })
 
   # Generate template: writes a fresh copy of the input workbook for the user to
@@ -760,6 +796,8 @@ server <- function(input, output, session) {
   )
 
   input_data <- shiny::reactive({
+    shiny::validate(shiny::need(is.null(rv$error),
+      "The uploaded workbook could not be loaded. See the message under the upload box on the Data step."))
     shiny::validate(shiny::need(!is.null(rv$data),
       "Upload the filled-in input data template (.xlsx) to begin."))
     rv$data
@@ -777,6 +815,7 @@ server <- function(input, output, session) {
   # A short confirmation of what loaded (filename, loss count, year range),
   # plus any soft data warnings read_input attached (amber, non-blocking).
   output$data_info <- shiny::renderUI({
+    if (!is.null(rv$error)) return(upload_error_ui(rv$name, rv$error))
     d <- input_data()
     yrs <- range(d$losses$year)
     shiny::tagList(

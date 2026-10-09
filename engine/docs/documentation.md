@@ -171,9 +171,18 @@ On load, `read_input` checks the workbook and refuses data the pipeline cannot
 price safely, with a plain message naming the sheet to fix: missing or
 non-positive losses, missing years, duplicate exposure or inflation years,
 non-positive exposures, loss years with no exposure row, and inflation that
-does not cover the span from the oldest loss to the valuation year. Losses at
-or below the reporting threshold are accepted but flagged with a warning on
-the Data step, since they contradict the declared completeness threshold.
+does not cover the span from the oldest indexed year to the valuation year.
+The oldest indexed year is the oldest loss or the oldest observed exposure
+year, whichever is earlier, since the reporting threshold is indexed from
+every year in the observation window, which can start before the first loss.
+Losses at or below the reporting threshold are accepted but flagged with a
+warning on the Data step, since they contradict the declared completeness
+threshold.
+
+In the dashboard, a workbook that fails these checks is reported in red under
+the upload box, one bullet per problem, and the tool keeps running so the user
+can fix the file and upload it again. A failed upload also clears any data
+loaded earlier, so no step can go on pricing an old workbook in its place.
 
 **Sheet `losses`** (one row per individual loss):
 
