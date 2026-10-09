@@ -39,3 +39,37 @@ test_that("price_layer expected loss converges to the validation oracle", {
   oracle <- expected_layer_loss(freq, sev, 5, 5)   # numerical survival integral
   expect_true(abs(priced$expected_loss - oracle) / oracle < 0.02)
 })
+
+test_that("expected_shortfall averages exactly the worst (1 - q) of years", {
+  # Plain case: 100 years 1..100, the worst 1% is the single year of 100 and
+  # the worst 5% is the mean of 96..100.
+  expect_equal(expected_shortfall(1:100, 0.99), 100)
+  expect_equal(expected_shortfall(1:100, 0.95), mean(96:100))
+  # Floating point in (1 - q) * n must not add an extra year: 100,000 years at
+  # 0.99 is exactly 1,000 tail years.
+  annual <- c(rep(0, 98999), rep(1, 1000), 5)
+  expect_equal(expected_shortfall(annual, 0.99), (999 + 5) / 1000)
+})
+
+test_that("TVaR is not dragged down by a point mass of zero years", {
+  # A rarely hit layer: 995 of 1,000 years at zero, 5 years with a loss. VaR99
+  # is 0, but the TVaR must still be the mean of the worst 10 years (the five
+  # losses plus five zeros), not the mean of every year.
+  annual <- c(rep(0, 995), 8, 12, 15, 20, 14)
+  row <- summarise_layer_losses(annual, list(cover = 20, deductible = 20),
+    list(loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99))
+  expect_equal(row$var, 0)
+  expect_equal(row$tvar, 69 / 10)
+  expect_gt(row$tvar, row$expected_loss)
+})
+
+test_that("TVaR is not dragged down by a point mass at the full limit", {
+  # 1,000 years: 950 at zero, 45 exhausting the layer exactly (50), 5 above it
+  # (several losses in one year). VaR99 lands on the limit point mass; the
+  # TVaR is the mean of the worst 10 years, 5 above the limit and 5 at it.
+  annual <- c(rep(0, 950), rep(50, 45), 60, 70, 80, 90, 100)
+  row <- summarise_layer_losses(annual, list(cover = 50, deductible = 50),
+    list(loading_ev = 0.1, loading_sd = 0.2, var_level = 0.99))
+  expect_equal(row$var, 50)
+  expect_equal(row$tvar, (60 + 70 + 80 + 90 + 100 + 5 * 50) / 10)
+})

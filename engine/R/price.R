@@ -26,13 +26,26 @@ layer_annual_losses <- function(sims, layer_row) {
   }, numeric(1))
 }
 
+# Expected shortfall (TVaR) at level q: the mean of the worst (1 - q) share of
+# the simulated years. Layer losses have point masses (many years at exactly 0,
+# or at exactly the full limit), so "the mean of the losses at or above VaR"
+# would pull in the whole point mass when VaR lands on it, averaging far more
+# than the worst (1 - q) of years (for a rarely hit layer, VaR is 0 and that
+# mean collapses to the expected loss). Averaging a fixed number of worst years
+# avoids this. The small tolerance stops floating point error in (1 - q) * n
+# (e.g. 1000.0000000000009) from rounding up to one extra year.
+expected_shortfall <- function(annual, q) {
+  n_tail <- max(1L, ceiling((1 - q) * length(annual) - 1e-9))
+  mean(sort(annual, decreasing = TRUE)[seq_len(n_tail)])
+}
+
 # Summarises one layer's simulated annual losses into the headline stats row:
 # expected loss, volatility, the tail measures and the two premiums.
 summarise_layer_losses <- function(annual, layer_row, premium_params) {
   expected_loss <- mean(annual)
   sd_loss <- stats::sd(annual)
   var_q <- stats::quantile(annual, premium_params$var_level, names = FALSE)
-  tvar <- mean(annual[annual >= var_q])
+  tvar <- expected_shortfall(annual, premium_params$var_level)
 
   premium_ev <- (1 + premium_params$loading_ev) * expected_loss
   premium_sd <- expected_loss + premium_params$loading_sd * sd_loss

@@ -437,8 +437,18 @@ empirical loss distribution for each layer. From it (`price_layer`):
 - **Standard deviation** $\mathrm{sd}[L]$, the volatility of the annual loss.
 - **Value at Risk** $\mathrm{VaR}_q$, the $q$ quantile of the annual loss at the
   user-chosen level $q$ (default 0.99).
-- **Tail Value at Risk** $\mathrm{TVaR}_q$, the mean of the losses at or above
-  the VaR.
+- **Tail Value at Risk** $\mathrm{TVaR}_q$ (expected shortfall), the mean of
+  the worst $(1-q)$ share of the simulated years: with $n$ simulated years, the
+  average of the largest $\lceil (1-q)\,n \rceil$ annual losses
+  (`expected_shortfall`). This is deliberately not the mean of the losses at or
+  above the VaR. A layer's annual loss has point masses, many years at exactly
+  0 (the layer is not hit) or at exactly the full limit (a loss exhausts it).
+  When the VaR lands on one of these, "at or above the VaR" takes in the whole
+  point mass, so it averages far more than the worst $(1-q)$ of years and
+  understates the tail; for a layer hit in fewer than $(1-q)$ of years the VaR
+  is 0 and that mean collapses to the expected loss. For a continuous loss
+  distribution the two definitions coincide; the expected shortfall is the
+  coherent one and stays correct with point masses.
 
 The Price step also plots this empirical distribution per layer: a histogram of
 the simulated annual losses to the selected layer, with the mean, VaR and TVaR
